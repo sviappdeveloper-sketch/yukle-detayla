@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Çalışma — Özet ve Testler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<style>
+:root{
+  --bg:#f4f1ea; --card:#fffdf8; --ink:#1f2430; --muted:#6b7080; --line:#e3ddd0;
+  --pri:#2f5d50; --pri2:#3f7a69; --acc:#e0a33a; --ok:#2e8b57; --okbg:#e3f3ea; --bad:#c0392b; --badbg:#fbe7e4;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#15181e;--card:#1e222b;--ink:#eceef2;--muted:#9aa0ad;--line:#2e3340;--pri:#5fb39b;--pri2:#76c7af;--okbg:#17352a;--badbg:#3a1d1a}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,sans-serif;line-height:1.55}
+.wrap{max-width:820px;margin:0 auto;padding:18px 16px 60px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--pri);display:grid;place-items:center;color:#fff;font-size:24px;flex:none}
+h1{font-size:1.35rem;margin:0}
+.sub{color:var(--muted);font-size:.9rem;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+.drop{border:2px dashed var(--line);border-radius:16px;padding:34px 16px;text-align:center;cursor:pointer;transition:.2s}
+.drop:hover,.drop.over{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 6%,transparent)}
+.drop .big{font-size:42px}
+.btn{appearance:none;border:0;border-radius:12px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer;background:var(--pri);color:#fff}
+.btn:hover{background:var(--pri2)}
+.btn.ghost{background:transparent;color:var(--pri);border:1.5px solid var(--pri)}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted)}
+.hidden{display:none!important}
+.steps{list-style:none;padding:0;margin:10px 0 0}
+.steps li{padding:7px 0;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
+.steps li:last-child{border:0}
+.dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center;font-size:12px}
+.steps li.run .dot{border-color:var(--acc);border-top-color:transparent;animation:spin 1s linear infinite}
+.steps li.done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.steps li.err .dot{background:var(--bad);border-color:var(--bad);color:#fff}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:12px}
+.bar>i{display:block;height:100%;background:var(--pri);width:0;transition:width .4s}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;position:sticky;top:0;background:var(--bg);z-index:5;padding-top:6px}
+.tab{flex:none;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer;font-size:.92rem}
+.tab.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.tab .sc{font-weight:600;opacity:.85;margin-left:4px;font-size:.8rem}
+.summary h2{margin:0 0 6px;font-size:1.25rem}
+.summary h3{margin:18px 0 6px;font-size:1.05rem;color:var(--pri)}
+.summary p{margin:0 0 10px}
+.summary ul{margin:0 0 10px;padding-left:20px}
+.kp li{margin-bottom:6px}
+.terms{display:grid;gap:8px}
+.term{border-left:3px solid var(--acc);padding:4px 10px;background:color-mix(in srgb,var(--acc) 8%,transparent);border-radius:0 8px 8px 0}
+.q{border-top:1px solid var(--line);padding:16px 0}
+.q:first-of-type{border-top:0;padding-top:4px}
+.qh{font-weight:700;margin-bottom:10px;display:flex;gap:8px}
+.qn{flex:none;background:var(--pri);color:#fff;border-radius:8px;min-width:28px;height:28px;display:grid;place-items:center;font-size:.85rem}
+.opts{display:grid;gap:7px}
+.opt{text-align:left;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;cursor:pointer;display:flex;gap:10px}
+.opt:hover:not(:disabled){border-color:var(--pri)}
+.opt b{flex:none;width:22px}
+.opt.sel{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 8%,transparent)}
+.opt.ok{border-color:var(--ok);background:var(--okbg)}
+.opt.bad{border-color:var(--bad);background:var(--badbg)}
+.opt:disabled{cursor:default}
+.exp{margin-top:8px;font-size:.92rem;padding:8px 12px;border-radius:10px;background:color-mix(in srgb,var(--muted) 10%,transparent)}
+.scorebox{display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.big-score{font-size:2rem;font-weight:800}
+.err-box{background:var(--badbg);color:var(--ink);border:1px solid var(--bad);border-radius:12px;padding:12px;margin-top:12px}
+.overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.ov{border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;background:var(--card)}
+.ov:hover{border-color:var(--pri)}
+.ov .t{font-weight:800}
+.ov .s{color:var(--muted);font-size:.9rem}
+.overlay-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:200px;z-index:2}
+[data-pick]{position:relative;overflow:hidden}
+input[type=file].hid{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (max-width:520px){.pgrid{grid-template-columns:1fr}}
+.pbtn{font:inherit;color:var(--ink);text-align:left;width:100%;display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;font-weight:700;background:var(--card);font-size:.95rem}
+.pbtn:hover,.pbtn:active{border-color:var(--pri)}
+.pbtn span{font-size:1.4rem}
+.thumbs{display:flex;gap:6px;overflow-x:auto;margin-top:8px}
+.thumbs img{height:84px;border-radius:8px;border:1px solid var(--line)}
+label.btn{display:inline-block}
+.fname{font-weight:700;word-break:break-word}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">📚</div>
+    <div>
+      <h1>PDF Çalışma</h1>
+      <p class="sub">PDF yükle → Özet + 5 test (her biri 20 soru)</p>
+    </div>
+  </header>
+
+  <!-- Yükleme -->
+  <section id="vUpload">
+    <div class="card">
+      <div class="drop" id="drop" role="button" tabindex="0" data-pick="file">
+        <div class="big">📄</div>
+        <div style="font-weight:800;font-size:1.1rem">PDF seç veya buraya sürükle</div>
+        <div class="muted" style="font-size:.9rem;margin-top:4px">Ders notu, kitap bölümü, makale… herhangi bir PDF</div>
+      </div>
+      <input type="file" class="hid" id="file" accept="application/pdf,.pdf">
+      <input type="file" class="hid" id="img" accept="image/*" multiple>
+      <input type="file" class="hid" id="cam" accept="image/*" capture="environment">
+      <div class="phone">
+        <div class="muted" style="font-size:.85rem;margin:14px 0 8px;text-align:center">📱 Telefondan yükle</div>
+        <div class="pgrid">
+          <button type="button" class="pbtn" data-pick="file"><span>📂</span>Dosyalardan PDF seç</button>
+          <button type="button" class="pbtn" data-pick="img"><span>🖼️</span>Galeriden sayfa fotoğrafları</button>
+          <button type="button" class="pbtn" data-pick="cam"><span>📷</span>Sayfanın fotoğrafını çek</button>
+        </div>
+      </div>
+      <div id="shots" class="hidden" style="margin-top:12px">
+        <div style="font-weight:700">Çekilen sayfalar: <span id="shotCount">0</span></div>
+        <div id="thumbs" class="thumbs"></div>
+        <div class="row" style="margin-top:10px">
+          <button type="button" class="btn ghost" data-pick="cam">📷 Bir sayfa daha çek</button>
+          <button class="btn" id="btnShots">Hazırla →</button>
+          <button class="btn ghost" id="btnShotsClear">Temizle</button>
+        </div>
+      </div>
+      <div id="noAi" class="err-box hidden">Yapay zekâ sunucusu ayarlı değil (config.js).</div>
+    </div>
+    <div class="card hidden" id="lastCard">
+      <div class="row" style="justify-content:space-between">
+        <div><div class="muted" style="font-size:.85rem">Son çalışma</div><div class="fname" id="lastName"></div></div>
+        <button class="btn ghost" id="lastOpen">Devam et</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- İşleniyor -->
+  <section id="vWork" class="hidden">
+    <div class="card">
+      <div class="fname" id="workName"></div>
+      <div class="muted" id="workInfo" style="font-size:.9rem"></div>
+      <ul class="steps" id="steps"></ul>
+      <div class="bar"><i id="barFill"></i></div>
+      <div id="workErr" class="err-box hidden"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn ghost hidden" id="btnShowPartial">Hazır olanları göster</button>
+        <button class="btn ghost" id="btnCancel">İptal</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sonuç -->
+  <section id="vStudy" class="hidden">
+    <div class="tabs" id="tabs"></div>
+    <div id="panel"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn ghost" id="btnNew">＋ Yeni PDF</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LETTERS = ['A','B','C','D','E'];
+const TEST_COUNT = 5, PER_TEST = 20;
+const MAX_CHARS = 120000;
+const TEST_FOCUS = [
+  'temel kavramlar ve tanımlar (kolay seviye)',
+  'önemli bilgiler, olgular ve detaylar (kolay-orta seviye)',
+  'neden-sonuç ilişkileri ve süreçler (orta seviye)',
+  'karşılaştırma, yorumlama ve uygulama (orta-zor seviye)',
+  'genel tekrar: tüm bölümlerden karma, zorlayıcı sorular (zor seviye)'
+];
+
+let sample = null, aborter = null;
+let state = null; // {name, summary, tests:[[...]], answers:[{}], tab}
+
+// ---------- Kayıt ----------
+const KEY = 'pdfCalisma.v1';
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ return null; } }
+
+// ---------- Görünümler ----------
+function show(id){ ['vUpload','vWork','vStudy'].forEach(v => $('#'+v).classList.toggle('hidden', v!==id)); window.scrollTo(0,0); }
+
+function refreshLast(){
+  const last = load();
+  const ok = last && last.summary;
+  $('#lastCard').classList.toggle('hidden', !ok);
+  if(ok) $('#lastName').textContent = last.name;
+}
+
+// ---------- Yapay zekâ ----------
+// Uygulama (APK) içinde APP_CONFIG ile kendi sunucumuz, claude.ai içinde Claude kullanılır
+function blobToB64(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(b); }); }
+function makeRemoteSample(cfg){
+  const f = async (prompt, opts={}) => {
+    const images = [];
+    for(const b of (opts.images||[])) images.push(await blobToB64(b));
+    let r;
+    try{
+      r = await fetch(cfg.apiUrl, {method:'POST', headers:{'content-type':'application/json','x-app-key':cfg.appKey||''},
+        body: JSON.stringify({prompt, images}), signal: opts.signal});
+    }catch(e){ if(opts.signal && opts.signal.aborted) throw e; throw new Error('İnternet bağlantısı yok gibi görünüyor.'); }
+    if(r.status===429) throw {code:'rate_limited', message:'Kullanım sınırı'};
+    let j = {}; try{ j = await r.json(); }catch(e){}
+    if(!r.ok) throw new Error(j.error || ('Sunucu hatası '+r.status));
+    return {text: j.text||'', truncated: !!j.truncated};
+  };
+  f.limits = async () => ({images:true});
+  return f;
+}
+const samplePromise = (async () => {
+  const cfg = window.APP_CONFIG;
+  if(cfg && cfg.apiUrl) return makeRemoteSample(cfg);
+  for(let i=0;i<30 && !window.claude;i++) await new Promise(r=>setTimeout(r,100));
+  try{ return window.claude ? await window.claude.use('sample') : null; }catch(e){ return null; }
+})();
+samplePromise.then(s => { sample = s; if(!s) $('#noAi').classList.remove('hidden'); });
+async function needAi(){ if(!sample) sample = await samplePromise; if(!sample){ $('#noAi').classList.remove('hidden'); return false; } return true; }
+
+// Dosya seçme düğmeleri
+// Her butonun üstüne gerçek (görünmez) dosya alanı yerleştir: dokunuş doğrudan ona gider
+function onPicked(kind, fs){
+  if(!fs.length) return;
+  if(kind==='file'){ start(fs[0]); }
+  else if(kind==='img'){ startImages(fs); }
+  else if(kind==='cam'){ shots.push(fs[0]); renderShots(); }
+}
+document.querySelectorAll('[data-pick]').forEach(b => {
+  const src = document.getElementById(b.dataset.pick); if(!src) return;
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.className = 'overlay-input';
+  inp.accept = src.accept; inp.multiple = src.multiple;
+  if(src.hasAttribute('capture')) inp.setAttribute('capture', src.getAttribute('capture'));
+  inp.setAttribute('aria-label', b.textContent.trim());
+  inp.addEventListener('click', e => e.stopPropagation());
+  inp.addEventListener('change', () => { const fs=[...inp.files]; inp.value=''; onPicked(b.dataset.pick, fs); });
+  b.appendChild(inp);
+});
+$('#drop').addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); const o=$('#drop .overlay-input'); if(o) o.click(); } });
+
+// ---------- Dosya seçimi ----------
+const drop = $('#drop');
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => {
+  const fs = [...e.dataTransfer.files];
+  const pdf = fs.find(f => /\.pdf$/i.test(f.name) || f.type==='application/pdf');
+  if(pdf) start(pdf); else if(fs.some(f=>f.type.startsWith('image/'))) startImages(fs.filter(f=>f.type.startsWith('image/')));
+});
+// Fotoğraflar
+let shots = [];
+$('#btnShots').addEventListener('click', () => { if(shots.length){ const s=shots; shots=[]; renderShots(); startImages(s); } });
+$('#btnShotsClear').addEventListener('click', () => { shots=[]; renderShots(); });
+function renderShots(){
+  $('#shots').classList.toggle('hidden', !shots.length);
+  $('#shotCount').textContent = shots.length;
+  $('#thumbs').innerHTML = '';
+  shots.forEach(f => { const im=document.createElement('img'); im.src=URL.createObjectURL(f); $('#thumbs').appendChild(im); });
+}
+async function shrink(file){
+  const url = URL.createObjectURL(file);
+  try{
+    const im = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+    const max=1600, k=Math.min(1, max/Math.max(im.width,im.height));
+    const c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+    return await new Promise(r=>c.toBlob(r,'image/jpeg',0.82));
+  } finally { URL.revokeObjectURL(url); }
+}
+$('#lastOpen').addEventListener('click', () => { state = load(); if(state) openStudy(); });
+$('#btnNew').addEventListener('click', () => { refreshLast(); show('vUpload'); });
+$('#btnCancel').addEventListener('click', () => { if(aborter) aborter.abort(); refreshLast(); show('vUpload'); });
+$('#btnShowPartial').addEventListener('click', () => openStudy());
+
+// ---------- Adımlar ----------
+const STEP_NAMES = ['PDF okunuyor','Özet hazırlanıyor', ...Array.from({length:TEST_COUNT},(_,i)=>`Test ${i+1} (20 soru)`)];
+function renderSteps(){
+  $('#steps').innerHTML = STEP_NAMES.map((n,i)=>`<li id="st${i}"><span class="dot"></span><span>${n}</span><span class="muted" id="stx${i}" style="margin-left:auto;font-size:.85rem"></span></li>`).join('');
+  setBar(0);
+}
+function step(i, cls, extra){ const li=$('#st'+i); if(!li) return; li.className=cls; if(cls==='done') li.querySelector('.dot').textContent='✓'; if(cls==='err') li.querySelector('.dot').textContent='!'; if(extra!==undefined) $('#stx'+i).textContent=extra; }
+function setBar(p){ $('#barFill').style.width = Math.round(p*100)+'%'; }
+
+// ---------- PDF okuma ----------
+async function readPdf(file){
+  const buf = await file.arrayBuffer();
+  const lib = window.pdfjsLib;
+  if(!lib) throw new Error('PDF okuyucu yüklenemedi. İnternet bağlantını kontrol edip sayfayı yenile.');
+  try{ lib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){}
+  const pdf = await lib.getDocument({data:buf, isEvalSupported:false}).promise;
+  let text = '';
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    let line = '', lastY = null;
+    for(const it of tc.items){
+      const y = it.transform ? it.transform[5] : null;
+      if(lastY!==null && y!==null && Math.abs(y-lastY)>2){ text += line.trim()+'\n'; line=''; }
+      line += it.str + (it.hasEOL ? '\n' : ' ');
+      lastY = y;
+    }
+    text += line.trim() + `\n\n[Sayfa ${p} sonu]\n\n`;
+    step(0,'run',`${p}/${pdf.numPages} sayfa`);
+  }
+  text = text.replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n');
+  const realChars = text.replace(/\[Sayfa \d+ sonu\]/g,'').replace(/\s/g,'').length;
+  let images = [];
+  // Taranmış (resim) PDF: metin yoksa ilk sayfaları resim olarak gönder
+  if(realChars < 200 * Math.min(pdf.numPages,3) / 3){
+    let canImg = false;
+    try{ const lim = await sample.limits(); canImg = !!(lim && lim.images); }catch(e){}
+    if(!canImg) throw new Error('Bu PDF taranmış (resim) görünüyor ve içinden metin okunamadı. Metin seçilebilen bir PDF dene.');
+    const n = Math.min(pdf.numPages, 12);
+    for(let p=1;p<=n;p++){
+      const page = await pdf.getPage(p);
+      const vp = page.getViewport({scale:1.6});
+      const c = document.createElement('canvas'); c.width=vp.width; c.height=vp.height;
+      await page.render({canvasContext:c.getContext('2d'), viewport:vp}).promise;
+      images.push(await new Promise(r=>c.toBlob(r,'image/jpeg',0.8)));
+      step(0,'run',`görüntü ${p}/${n}`);
+    }
+  }
+  return {text, pages: pdf.numPages, images};
+}
+
+// ---------- JSON yardımcı ----------
+function parseJson(t){
+  if(t && typeof t === 'object') return t;
+  let s = String(t||'').trim();
+  s = s.replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  const a2 = s.indexOf('['), b2 = s.lastIndexOf(']');
+  try{ return JSON.parse(s); }catch(e){}
+  if(a>=0 && b>a){ try{ return JSON.parse(s.slice(a,b+1)); }catch(e){} }
+  if(a2>=0 && b2>a2){ try{ return JSON.parse(s.slice(a2,b2+1)); }catch(e){} }
+  throw new Error('Yanıt okunamadı');
+}
+async function ask(prompt, images, tier){
+  const opts = { signal: aborter.signal, modelTier: tier || 'default' };
+  if(images && images.length) opts.images = images;
+  for(let attempt=0;;attempt++){
+    try{
+      const r = await sample(prompt, opts);
+      return parseJson(r.text);
+    }catch(e){
+      if(e && e.code==='rate_limited' && attempt < 3 && !aborter.signal.aborted){
+        for(let s=40; s>0; s--){
+          if(aborter.signal.aborted) throw e;
+          $('#workInfo').textContent = `Yoğunluk var, ${s} sn sonra tekrar denenecek…`;
+          await new Promise(r=>setTimeout(r,1000));
+        }
+        $('#workInfo').textContent = 'Bu işlem birkaç dakika sürebilir. Sayfayı kapatma.';
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+function docBlock(doc){
+  if(doc.images.length) return 'BELGE: Ekteki sayfa görüntüleri (taranmış PDF veya sayfa fotoğrafları). Görüntülerdeki yazıyı dikkatle oku.';
+  let t = doc.text;
+  let note = '';
+  if(t.length > MAX_CHARS){ t = t.slice(0, MAX_CHARS); note = '\n(Not: belge çok uzun olduğu için ilk kısmı verildi.)'; }
+  return `BELGE METNİ:\n<<<\n${t}\n>>>${note}`;
+}
+
+// ---------- Ana akış ----------
+async function start(file){
+  if(!/\.pdf$/i.test(file.name) && file.type!=='application/pdf'){ alertBox('Lütfen bir PDF dosyası seç.'); return; }
+  if(!(await needAi())) return;
+  begin(file.name);
+  const total = 2 + TEST_COUNT;
+  let doc;
+  try{
+    step(0,'run'); doc = await readPdf(file);
+    step(0,'done', `${doc.pages} sayfa`); setBar(1/total);
+  }catch(e){ step(0,'err'); return fail(e.message || 'PDF okunamadı.'); }
+  return generate(doc);
+}
+
+function begin(name){
+  aborter = new AbortController();
+  state = { name, summary:null, tests:[], answers:[], tab:'ozet', created: Date.now() };
+  $('#workName').textContent = name;
+  $('#workInfo').textContent = 'Bu işlem birkaç dakika sürebilir. Sayfayı kapatma.';
+  $('#workErr').classList.add('hidden');
+  $('#btnShowPartial').classList.add('hidden');
+  renderSteps(); show('vWork');
+}
+
+async function startImages(files){
+  if(!(await needAi())) return;
+  files = files.slice(0, 20);
+  begin(files.length===1 ? 'Fotoğraf (1 sayfa)' : `Fotoğraflar (${files.length} sayfa)`);
+  const doc = {text:'', pages:files.length, images:[]};
+  try{
+    step(0,'run');
+    let canImg = false;
+    try{ const lim = await sample.limits(); canImg = !!(lim && lim.images); }catch(e){}
+    if(!canImg) throw new Error('Bu görünümde fotoğraf okunamıyor. PDF yüklemeyi dene.');
+    for(let i=0;i<files.length;i++){ doc.images.push(await shrink(files[i])); step(0,'run',`${i+1}/${files.length} fotoğraf`); }
+    step(0,'done', `${files.length} sayfa`); setBar(1/(2+TEST_COUNT));
+  }catch(e){ step(0,'err'); return fail(e.message || 'Fotoğraflar okunamadı.'); }
+  return generate(doc);
+}
+
+async function generate(doc){
+  const total = 2 + TEST_COUNT;
+  // Özet
+  try{
+    step(1,'run');
+    const sp = `Sen deneyimli bir Türk öğretmensin. Aşağıdaki belgeyi öğrencinin çalışması için TÜRKÇE özetle.
+Belge başka bir dilde olsa bile özeti Türkçe yaz.
+YALNIZCA şu biçimde geçerli JSON döndür, başka hiçbir şey yazma:
+{"baslik":"belgenin konusu (kısa)","genel":"2-4 cümlelik genel özet","bolumler":[{"baslik":"alt başlık","ozet":"bu bölümün 3-6 cümlelik özeti","maddeler":["önemli nokta", "..."]}],"anahtar_kavramlar":[{"kavram":"terim","tanim":"kısa tanım"}],"akilda_kal":["sınavda çıkabilecek en önemli 5-10 bilgi"]}
+Belgenin tüm önemli konularını kapsa; uydurma bilgi ekleme.
+
+${docBlock(doc)}`;
+    state.summary = await ask(sp, doc.images, 'complex');
+    step(1,'done'); setBar(2/total); save();
+  }catch(e){ if(aborter.signal.aborted) return; step(1,'err'); return fail(errText(e)); }
+
+  // Testler: istek sayısını azaltmak için gruplar halinde (3+2 test)
+  const GROUPS = [[0,1,2],[3,4]];
+  const prevStems = [];
+  for(const g of GROUPS){
+    if(aborter.signal.aborted) return;
+    g.forEach(t => step(2+t,'run'));
+    let got = null, tries = 0;
+    while(!got && tries < 2){
+      tries++;
+      try{
+        const avoid = prevStems.length ? `\nÖnceki testlerde sorulan şu sorulara BENZEMEYEN yeni sorular yaz:\n- ${prevStems.slice(-60).join('\n- ')}\n` : '';
+        const list = g.map(t => `- Test ${t+1}: ${TEST_FOCUS[t]}`).join('\n');
+        const qp = `Sen deneyimli bir Türk öğretmensin. Aşağıdaki belgeye dayanarak TÜRKÇE çoktan seçmeli testler hazırla.
+${g.length} ayrı test yaz, her birinde TAM OLARAK ${PER_TEST} soru olsun:
+${list}
+Kurallar:
+- Her sorunun 4 şıkkı olsun (A-D), yalnızca biri doğru.
+- Doğru şıkkın yeri sorular arasında dağınık olsun.
+- Sorular yalnızca belgedeki bilgilere dayansın; testler arasında aynı soruyu tekrar etme.
+- Her soru için doğru cevabın neden doğru olduğunu 1 cümleyle açıkla.${avoid}
+YALNIZCA şu biçimde geçerli JSON döndür, başka hiçbir şey yazma:
+{"testler":[{"sorular":[{"soru":"...","secenekler":["...","...","...","..."],"dogru":0,"aciklama":"..."}]}]}
+("testler" dizisinde ${g.length} eleman olsun, sırası yukarıdaki gibi. "dogru" doğru şıkkın 0'dan başlayan sırasıdır.)
+
+${docBlock(doc)}`;
+        const r = await ask(qp, doc.images, 'default');
+        const tests = r.testler || r.tests || (r.sorular ? [r] : []);
+        const clean = arr => (arr||[]).filter(q => q && q.soru && Array.isArray(q.secenekler) && q.secenekler.length>=2)
+          .map(q => ({ soru:q.soru, secenekler:q.secenekler.slice(0,5), dogru: Math.max(0, Math.min(q.secenekler.length-1, parseInt(q.dogru,10)||0)), aciklama:q.aciklama||'' }));
+        const out = g.map((t,i) => clean(tests[i] && (tests[i].sorular || tests[i].questions || tests[i])).slice(0, PER_TEST));
+        if(out.some(a => a.length < 5)) throw new Error('Yeterli soru üretilemedi');
+        got = out;
+      }catch(e){
+        if(aborter.signal.aborted) return;
+        if(e && e.code==='not_granted'){ g.forEach(t=>step(2+t,'err')); return fail('Yapay zekâ izni verilmedi.'); }
+        if(e && e.code==='rate_limited'){ g.forEach(t=>step(2+t,'err','limit')); return fail('Günlük ücretsiz kullanım sınırına ulaşıldı. Hazır olanları açabilir, daha sonra tekrar deneyebilirsin.'); }
+        if(tries>=2){ g.forEach(t=>step(2+t,'err')); return fail(errText(e)); }
+      }
+    }
+    g.forEach((t,i) => {
+      state.tests[t] = got[i]; state.answers[t] = {};
+      got[i].forEach(q => prevStems.push(q.soru.slice(0,90)));
+      step(2+t,'done', `${got[i].length} soru`);
+    });
+    setBar((3+g[g.length-1])/total); save();
+  }
+  openStudy();
+}
+function errText(e){
+  if(e && e.code==='rate_limited') return 'Kullanım sınırına ulaşıldı. Biraz sonra tekrar dene.';
+  if(e && e.code==='not_granted') return 'Yapay zekâ izni verilmedi.';
+  return (e && e.message) ? 'Bir sorun oldu: '+e.message : 'Bir sorun oldu.';
+}
+function fail(msg){
+  const box = $('#workErr'); box.textContent = msg; box.classList.remove('hidden');
+  if(state && state.summary){ $('#btnShowPartial').classList.remove('hidden'); save(); }
+}
+function alertBox(msg){ const b=$('#noAi'); b.textContent=msg; b.classList.remove('hidden'); }
+
+// ---------- Çalışma ekranı ----------
+function scoreOf(t){
+  const qs = state.tests[t]||[], a = state.answers[t]||{};
+  let c=0,n=0; qs.forEach((q,i)=>{ if(a[i]!==undefined){ n++; if(a[i]===q.dogru) c++; } });
+  return {c,n,total:qs.length};
+}
+function renderTabs(){
+  const tabs = [{id:'ozet',label:'📝 Özet'}];
+  state.tests.forEach((q,i)=>{ if(q){ const s=scoreOf(i); tabs.push({id:'t'+i,label:`Test ${i+1}`,sc: s.n? `${s.c}/${s.total}`:''}); } });
+  $('#tabs').innerHTML = tabs.map(t=>`<button class="tab ${state.tab===t.id?'on':''}" data-t="${t.id}">${t.label}${t.sc?`<span class="sc">${t.sc}</span>`:''}</button>`).join('');
+  $('#tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ state.tab=b.dataset.t; save(); renderAll(); window.scrollTo(0,0); });
+}
+function renderSummary(){
+  const s = state.summary||{};
+  const bol = (s.bolumler||[]).map(b=>`<h3>${esc(b.baslik)}</h3><p>${esc(b.ozet)}</p>${(b.maddeler||[]).length?`<ul>${b.maddeler.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}`).join('');
+  const kav = (s.anahtar_kavramlar||[]).map(k=>`<div class="term"><b>${esc(k.kavram)}</b> — ${esc(k.tanim)}</div>`).join('');
+  const ak = (s.akilda_kal||[]).map(m=>`<li>${esc(m)}</li>`).join('');
+  const ov = state.tests.map((q,i)=>{ if(!q) return ''; const sc=scoreOf(i); return `<div class="ov" data-t="t${i}"><div class="t">Test ${i+1}</div><div class="s">${sc.n?`${sc.c} doğru / ${sc.total}`:`${q.length} soru · başlanmadı`}</div></div>`; }).join('');
+  return `<div class="card summary">
+    <h2>${esc(s.baslik||state.name)}</h2>
+    <p class="muted" style="font-size:.85rem">${esc(state.name)}</p>
+    <p>${esc(s.genel)}</p>
+    ${bol}
+    ${kav?`<h3>Anahtar Kavramlar</h3><div class="terms">${kav}</div>`:''}
+    ${ak?`<h3>⭐ Akılda Kalsın</h3><ul class="kp">${ak}</ul>`:''}
+  </div>
+  ${ov?`<div class="card"><div style="font-weight:800;margin-bottom:10px">Testler</div><div class="overview">${ov}</div></div>`:''}`;
+}
+function renderTest(t){
+  const qs = state.tests[t], a = state.answers[t] || (state.answers[t]={});
+  const sc = scoreOf(t);
+  const done = sc.n === sc.total;
+  const items = qs.map((q,i)=>{
+    const chosen = a[i];
+    const answered = chosen!==undefined;
+    const opts = q.secenekler.map((o,j)=>{
+      let cls='opt';
+      if(answered){ if(j===q.dogru) cls+=' ok'; else if(j===chosen) cls+=' bad'; }
+      return `<button class="${cls}" data-q="${i}" data-o="${j}" ${answered?'disabled':''}><b>${LETTERS[j]})</b><span>${esc(o)}</span></button>`;
+    }).join('');
+    const exp = answered ? `<div class="exp">${chosen===q.dogru?'✅ Doğru!':'❌ Yanlış. Doğru cevap: <b>'+LETTERS[q.dogru]+'</b>'} ${esc(q.aciklama)}</div>` : '';
+    return `<div class="q"><div class="qh"><span class="qn">${i+1}</span><span>${esc(q.soru)}</span></div><div class="opts">${opts}</div>${exp}</div>`;
+  }).join('');
+  return `<div class="card"><div class="scorebox">
+      <div><div style="font-weight:800;font-size:1.1rem">Test ${t+1}</div><div class="muted" style="font-size:.9rem">${esc(TEST_FOCUS[t])}</div></div>
+      <div style="text-align:right"><div class="big-score">${sc.c}<span class="muted" style="font-size:1rem"> / ${sc.total}</span></div><div class="muted" style="font-size:.85rem">${sc.n} cevaplandı · ${sc.n-sc.c} yanlış</div></div>
+    </div>
+    ${done?`<div class="exp" style="margin-top:12px">🎉 Test bitti! Başarı: <b>%${Math.round(sc.c/sc.total*100)}</b></div>`:''}
+    <div class="row" style="margin-top:12px"><button class="btn ghost" id="btnReset">↺ Testi sıfırla</button>${t<TEST_COUNT-1&&state.tests[t+1]?`<button class="btn ghost" id="btnNext">Sonraki test →</button>`:''}</div>
+  </div>
+  <div class="card">${items}</div>`;
+}
+function renderAll(){
+  renderTabs();
+  const p = $('#panel');
+  if(state.tab==='ozet' || !state.tab.startsWith('t') || !state.tests[+state.tab.slice(1)]){ state.tab='ozet'; renderTabs(); p.innerHTML = renderSummary();
+    p.querySelectorAll('.ov').forEach(d=>d.onclick=()=>{ state.tab=d.dataset.t; save(); renderAll(); window.scrollTo(0,0); });
+    return; }
+  const t = +state.tab.slice(1);
+  p.innerHTML = renderTest(t);
+  p.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    const qi=+b.dataset.q, oi=+b.dataset.o;
+    if(state.answers[t][qi]!==undefined) return;
+    state.answers[t][qi]=oi; save();
+    const y = window.scrollY; renderAll(); window.scrollTo(0,y);
+  });
+  const r=$('#btnReset'); if(r) r.onclick=()=>{ state.answers[t]={}; save(); renderAll(); window.scrollTo(0,0); };
+  const n=$('#btnNext'); if(n) n.onclick=()=>{ state.tab='t'+(t+1); save(); renderAll(); window.scrollTo(0,0); };
+}
+function openStudy(){ show('vStudy'); renderAll(); }
+
+// Android geri tuşu: true = sayfa içinde geri gidildi, false = uygulamadan çık
+window.appBack = function(){
+  if(!$('#vWork').classList.contains('hidden')){ if(aborter) aborter.abort(); refreshLast(); show('vUpload'); return true; }
+  if(!$('#vStudy').classList.contains('hidden')){
+    if(state && state.tab !== 'ozet'){ state.tab='ozet'; save(); renderAll(); window.scrollTo(0,0); return true; }
+    refreshLast(); show('vUpload'); return true;
+  }
+  return false;
+};
+refreshLast();
+})();
+</script>
+</body>
+</html>
