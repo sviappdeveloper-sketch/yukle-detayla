@@ -1,4 +1,4 @@
-# PDF Çalışma — Android Uygulaması Kurulum Rehberi
+# Yükle Detayla — Android Uygulaması Kurulum Rehberi
 
 Uygulama 3 parçadan oluşur ve **tamamen ücretsizdir**:
 
@@ -22,32 +22,32 @@ Uygulama 3 parçadan oluşur ve **tamamen ücretsizdir**:
 
 1. https://dash.cloudflare.com adresinde ücretsiz hesap aç.
 2. Sol menü: **Compute (Workers) → Workers & Pages → Create → Create Worker**.
-3. Adını `pdf-calisma` yap → **Deploy**.
+3. Adını `yukle-detayla` yap → **Deploy**.
 4. **Edit code**'a bas, oradaki kodu tamamen sil, `worker/worker.js` dosyasının içeriğini yapıştır → **Deploy**.
 5. Worker sayfasında **Settings → Variables and Secrets → Add**:
    - `GEMINI_API_KEY` → Tür: **Secret** → 1. adımdaki `AIza...` anahtarın
    - `APP_KEY` → Tür: **Secret** → `app/src/main/assets/config.js` dosyasındaki `appKey` değeri (aynısını kopyala)
-6. Worker'ın adresini kopyala (ör. `https://pdf-calisma.KULLANICIADIN.workers.dev`).
+6. Worker'ın adresini kopyala (ör. `https://yukle-detayla.KULLANICIADIN.workers.dev`).
 
 ## 3. Uygulamaya sunucu adresini yaz
 
 `app/src/main/assets/config.js` dosyasını aç ve `apiUrl` satırına 2. adımdaki adresi yaz:
 
 ```js
-apiUrl: "https://pdf-calisma.KULLANICIADIN.workers.dev",
+apiUrl: "https://yukle-detayla.KULLANICIADIN.workers.dev",
 ```
 
 ## 4. GitHub'a yükle
 
-1. GitHub'da yeni bir depo aç: `pdf-calisma` (Private olabilir).
+1. GitHub'da yeni bir depo aç: `yukle-detayla` (Private olabilir).
 2. Bu klasördeki tüm dosyaları depoya yükle (**Add file → Upload files**, klasörleri sürükleyerek).
    `codemagic.yaml` dosyası en üst seviyede olmalı.
 
 ## 5. Codemagic'te APK derle
 
-1. https://codemagic.io → **Add application** → GitHub → `pdf-calisma` deposunu seç.
+1. https://codemagic.io → **Add application** → GitHub → `yukle-detayla` deposunu seç.
 2. Proje tipi sorulursa **codemagic.yaml** seç.
-3. **Start new build** → workflow: **PDF Çalışma APK** → Start.
+3. **Start new build** → workflow: **Yükle Detayla APK** → Start.
 4. Derleme bitince **Artifacts** bölümünden `app-debug.apk` dosyasını indir ve telefona kur.
 
 ---

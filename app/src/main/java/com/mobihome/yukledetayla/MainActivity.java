@@ -1,4 +1,4 @@
-package com.mobihome.pdfcalisma;
+package com.mobihome.yukledetayla;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;

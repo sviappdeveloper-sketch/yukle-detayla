@@ -1,9 +1,9 @@
 plugins { id 'com.android.application' }
 android {
-  namespace 'com.mobihome.pdfcalisma'
+  namespace 'com.mobihome.yukledetayla'
   compileSdk 35
   defaultConfig {
-    applicationId "com.mobihome.pdfcalisma"
+    applicationId "com.mobihome.yukledetayla"
     minSdk 24
     targetSdk 35
     versionCode 1

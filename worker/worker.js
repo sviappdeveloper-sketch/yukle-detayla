@@ -1,4 +1,4 @@
-// PDF Çalışma — ücretsiz yapay zekâ sunucusu (Cloudflare Worker + Google Gemini ücretsiz kota)
+// Yükle Detayla — ücretsiz yapay zekâ sunucusu (Cloudflare Worker + Google Gemini ücretsiz kota)
 // Gerekli ayarlar (Worker > Settings > Variables and Secrets):
 //   GEMINI_API_KEY (Secret) : Google AI Studio'dan alınan ücretsiz anahtar
 //   APP_KEY        (Secret) : uygulamadaki config.js içindeki appKey ile aynı
