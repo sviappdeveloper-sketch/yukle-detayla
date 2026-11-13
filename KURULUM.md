@@ -26,7 +26,6 @@ Uygulama 3 parçadan oluşur ve **tamamen ücretsizdir**:
 4. **Edit code**'a bas, oradaki kodu tamamen sil, `worker/worker.js` dosyasının içeriğini yapıştır → **Deploy**.
 5. Worker sayfasında **Settings → Variables and Secrets → Add**:
    - `GEMINI_API_KEY` → Tür: **Secret** → 1. adımdaki `AIza...` anahtarın
-   - `APP_KEY` → Tür: **Secret** → `app/src/main/assets/config.js` dosyasındaki `appKey` değeri (aynısını kopyala)
 6. Worker'ın adresini kopyala (ör. `https://yukle-detayla.KULLANICIADIN.workers.dev`).
 
 ## 3. Uygulamaya sunucu adresini yaz
@@ -57,7 +56,7 @@ apiUrl: "https://yukle-detayla.KULLANICIADIN.workers.dev",
 | Sorun | Çözüm |
 |---|---|
 | "Yapay zekâ sunucusu ayarlı değil" | 3. adımdaki `apiUrl` yazılmamış. |
-| "Yetkisiz" | Cloudflare'deki `APP_KEY` ile `config.js` içindeki `appKey` aynı değil. |
+| "Yetkisiz" | `worker.js` içindeki `APP_KEY` ile `config.js` içindeki `appKey` aynı değil. |
 | "Günlük ücretsiz kullanım sınırı" | Tüm ücretsiz modellerin günlük kotası dolmuş; ertesi gün açılır. |
 | "Sunucuda GEMINI_API_KEY ayarlı değil" | 2. adım 5'teki anahtar eklenmemiş. |
 

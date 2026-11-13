@@ -1,7 +1,6 @@
 // Yükle Detayla — ücretsiz yapay zekâ sunucusu (Cloudflare Worker + Google Gemini ücretsiz kota)
 // Gerekli ayarlar (Worker > Settings > Variables and Secrets):
 //   GEMINI_API_KEY (Secret) : Google AI Studio'dan alınan ücretsiz anahtar
-//   APP_KEY        (Secret) : uygulamadaki config.js içindeki appKey ile aynı
 //   MODELS         (isteğe bağlı) : virgülle ayrılmış model listesi, sırayla denenir
 
 // Her modelin ayrı günlük ücretsiz kotası var: biri dolunca/bulunamazsa sıradakine geçilir.
@@ -12,6 +11,9 @@ const DEFAULT_MODELS = [
   'gemini-3.5-flash',
   'gemini-2.5-flash',
 ];
+
+// Uygulamanın içindeki appKey ile aynı (uygulamaya özel kimlik, gizli bir şifre değil)
+const APP_KEY = 'pJkL9huy6FeWD-uZoZHRyY0Et-JqNGFx';
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -39,7 +41,7 @@ export default {
   async fetch(req, env) {
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (req.method !== 'POST') return json({ error: 'Sadece POST' }, 405);
-    if (!env.APP_KEY || req.headers.get('x-app-key') !== env.APP_KEY) return json({ error: 'Yetkisiz' }, 401);
+    if (req.headers.get('x-app-key') !== (env.APP_KEY || APP_KEY)) return json({ error: 'Yetkisiz' }, 401);
     if (!env.GEMINI_API_KEY) return json({ error: 'Sunucuda GEMINI_API_KEY ayarlı değil' }, 500);
 
     let body;
