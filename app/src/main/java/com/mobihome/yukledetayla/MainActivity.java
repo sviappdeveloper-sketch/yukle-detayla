@@ -40,10 +40,15 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.auth.OAuthProvider;
 import com.google.firebase.auth.UserInfo;
+
+import com.google.android.ump.ConsentInformation;
+import com.google.android.ump.ConsentRequestParameters;
+import com.google.android.ump.UserMessagingPlatform;
 
 import org.json.JSONObject;
 
@@ -62,6 +67,9 @@ public class MainActivity extends Activity {
     private Uri cameraUri;
     private InterstitialAd interstitial;
     private final Executor bg = Executors.newSingleThreadExecutor();
+    private boolean pendingDelete = false;
+    private boolean adsStarted = false;
+    private ConsentInformation consent;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,10 +127,16 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Reklamlar
+        // Reklamlar: önce (AB/Birleşik Krallık'ta) izin formu, sonra AdMob
         try {
-            MobileAds.initialize(this, status -> loadInterstitial());
-        } catch (Throwable ignored) {}
+            consent = UserMessagingPlatform.getConsentInformation(this);
+            consent.requestConsentInfoUpdate(this, new ConsentRequestParameters.Builder().build(),
+                    () -> UserMessagingPlatform.loadAndShowConsentFormIfRequired(this, err -> startAds()),
+                    err -> startAds());
+            if (consent.canRequestAds()) startAds();
+        } catch (Throwable t) {
+            startAds();
+        }
 
         // Apple girişi yarıda kaldıysa sonucu al
         try {
@@ -158,9 +172,18 @@ public class MainActivity extends Activity {
                             try {
                                 GoogleIdTokenCredential g = GoogleIdTokenCredential.createFrom(c.getData());
                                 AuthCredential ac = GoogleAuthProvider.getCredential(g.getIdToken(), null);
-                                runOnUiThread(() -> auth.signInWithCredential(ac)
-                                        .addOnSuccessListener(r -> sendUser(r.getUser(), "Google"))
-                                        .addOnFailureListener(e -> sendError("Google girişi başarısız: " + e.getMessage())));
+                                runOnUiThread(() -> {
+                                    FirebaseUser cu = auth.getCurrentUser();
+                                    if (pendingDelete && cu != null) {
+                                        cu.reauthenticate(ac)
+                                                .addOnSuccessListener(v -> deleteNow())
+                                                .addOnFailureListener(e -> { pendingDelete = false; sendDeleted(false, e.getMessage()); });
+                                        return;
+                                    }
+                                    auth.signInWithCredential(ac)
+                                            .addOnSuccessListener(r -> sendUser(r.getUser(), "Google"))
+                                            .addOnFailureListener(e -> sendError("Google girişi başarısız: " + e.getMessage()));
+                                });
                             } catch (Exception e) {
                                 sendError("Google girişi okunamadı.");
                             }
@@ -171,6 +194,7 @@ public class MainActivity extends Activity {
 
                     @Override
                     public void onError(@NonNull GetCredentialException e) {
+                        if (pendingDelete) { pendingDelete = false; sendDeleted(false, "Doğrulama iptal edildi."); return; }
                         if (e instanceof GetCredentialCancellationException) sendError("Giriş iptal edildi.");
                         else sendError("Google girişi yapılamadı: " + e.getMessage());
                     }
@@ -186,6 +210,62 @@ public class MainActivity extends Activity {
         auth.startActivityForSignInWithProvider(this, pb.build())
                 .addOnSuccessListener(r -> sendUser(r.getUser(), "Apple"))
                 .addOnFailureListener(e -> sendError("Apple girişi yapılamadı: " + e.getMessage()));
+    }
+
+    // ===================== Hesap silme =====================
+    private void deleteAccount() {
+        FirebaseAuth a = auth();
+        FirebaseUser u = a == null ? null : a.getCurrentUser();
+        if (u == null) { sendDeleted(true, null); return; }
+        u.delete()
+                .addOnSuccessListener(v -> afterDeleted())
+                .addOnFailureListener(e -> {
+                    if (e instanceof FirebaseAuthRecentLoginRequiredException) {
+                        pendingDelete = true;
+                        boolean apple = false;
+                        for (UserInfo info : u.getProviderData()) if ("apple.com".equals(info.getProviderId())) apple = true;
+                        if (apple) {
+                            OAuthProvider.Builder pb = OAuthProvider.newBuilder("apple.com");
+                            u.startActivityForReauthenticateWithProvider(this, pb.build())
+                                    .addOnSuccessListener(r -> deleteNow())
+                                    .addOnFailureListener(err -> { pendingDelete = false; sendDeleted(false, err.getMessage()); });
+                        } else {
+                            signInGoogle();
+                        }
+                    } else {
+                        sendDeleted(false, e.getMessage());
+                    }
+                });
+    }
+
+    private void deleteNow() {
+        FirebaseAuth a = auth();
+        FirebaseUser u = a == null ? null : a.getCurrentUser();
+        pendingDelete = false;
+        if (u == null) { afterDeleted(); return; }
+        u.delete().addOnSuccessListener(v -> afterDeleted())
+                .addOnFailureListener(e -> sendDeleted(false, e.getMessage()));
+    }
+
+    private void afterDeleted() {
+        FirebaseAuth a = auth();
+        if (a != null) a.signOut();
+        try { CredentialManager.create(this).clearCredentialStateAsync(
+                new androidx.credentials.ClearCredentialStateRequest(), new CancellationSignal(), bg,
+                new CredentialManagerCallback<Void, androidx.credentials.exceptions.ClearCredentialException>() {
+                    @Override public void onResult(Void v) {}
+                    @Override public void onError(@NonNull androidx.credentials.exceptions.ClearCredentialException e) {}
+                }); } catch (Throwable ignored) {}
+        sendDeleted(true, null);
+    }
+
+    private void sendDeleted(boolean ok, String err) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("ok", ok);
+            if (!ok) o.put("error", err == null ? "Hesap silinemedi." : err);
+            js("window.onNativeDeleted && window.onNativeDeleted(" + JSONObject.quote(o.toString()) + ")");
+        } catch (Exception ignored) {}
     }
 
     private String userJson(FirebaseUser u, String provider) {
@@ -232,6 +312,15 @@ public class MainActivity extends Activity {
     }
 
     // ===================== Reklam =====================
+    private void startAds() {
+        runOnUiThread(() -> {
+            if (adsStarted) return;
+            if (consent != null && !consent.canRequestAds()) return;
+            adsStarted = true;
+            try { MobileAds.initialize(this, status -> loadInterstitial()); } catch (Throwable ignored) {}
+        });
+    }
+
     private void loadInterstitial() {
         runOnUiThread(() -> {
             try {
@@ -305,6 +394,7 @@ public class MainActivity extends Activity {
             return a == null ? "" : userJson(a.getCurrentUser(), null);
         }
         @JavascriptInterface public void showInterstitial() { MainActivity.this.showInterstitial(); }
+        @JavascriptInterface public void deleteAccount() { runOnUiThread(MainActivity.this::deleteAccount); }
         @JavascriptInterface public void shareImage(String b64, String text) { MainActivity.this.shareImage(b64, text); }
         @JavascriptInterface public void shareText(String text) { MainActivity.this.shareText(text); }
     }

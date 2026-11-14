@@ -15,7 +15,8 @@ android {
     applicationId "com.mobihome.yukledetayla"
     minSdk 24
     targetSdk 35
-    versionCode 2
+    // Codemagic her derlemede BUILD_NUMBER verir; mağaza için her zaman artan sürüm kodu
+    versionCode 10 + Integer.parseInt(System.getenv("BUILD_NUMBER") ?: "0")
     versionName "1.1"
     manifestPlaceholders = [admobAppId: ADMOB_APP_ID]
     buildConfigField "String", "ADMOB_INTERSTITIAL_ID", "\"${ADMOB_INTERSTITIAL_ID}\""
@@ -44,4 +45,5 @@ dependencies {
   implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
   implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
   implementation 'com.google.android.gms:play-services-ads:23.6.0'
+  implementation 'com.google.android.ump:user-messaging-platform:3.1.0'
 }

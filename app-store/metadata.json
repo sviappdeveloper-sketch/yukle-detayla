@@ -1,0 +1,34 @@
+{
+  "_aciklama": "tool/asc_islem.py bu dosyayı okuyup App Store Connect'e yazar.",
+  "locale": "tr",
+  "name": "Yükle Detayla",
+  "subtitle": "PDF özet, test ve soru bankası",
+  "promotionalText": "PDF'ini veya ders notunun fotoğrafını yükle: özetini oku, 20'şer soruluk testlerle çalış, cevabın geçtiği sayfaya tek dokunuşla git.",
+  "keywords": "pdf,özet,test,soru,sınav,ders,çalışma,quiz,yks,kpss,lgs,not,kitap,tekrar,öğrenci",
+  "description": "PDF'ini yükle; Yükle Detayla senin için özetini çıkarsın, 20'şer soruluk testler hazırlasın.\n\n📤 PDF VEYA SAYFA FOTOĞRAFI\nDers notu, kitap bölümü, makale… Herhangi bir PDF'i seç ya da defter ve kitap sayfalarının fotoğrafını çek. Kaç test istediğini (0–5) ve özet isteyip istemediğini sen seç.\n\n📝 ÖZET\nGenel özet, bölüm bölüm açıklamalar, anahtar kavramlar ve \"Akılda Kalsın\" listesi. Her bilginin yanında hangi sayfada geçtiği yazar; dokununca o sayfa açılır.\n\n🧪 TESTLER\nHer test 20 çoktan seçmeli sorudan oluşur, kolaydan zora sıralanır. Cevapladığın an doğru mu yanlış mı görürsün; açıklamada cevabın geçtiği sayfa ve kısa bir alıntı yer alır. \"Kaynağa git\" ile o sayfayı aç, geri dönünce testte kaldığın sorudan devam et.\n\n🔀 KARIŞIK SOR\nTüm testlerindeki sorular karışık sırayla karşına gelir; tekrar için birebir.\n\n❓ GÜNÜN SORUSU VE 🧊 BİLGİ KÜPÜ\nAna ekranda her gün yeni bir soru ve yüklediğin belgelerden bir bilgi seni bekler.\n\n⭐ FAVORİLER VE PAYLAŞIM\nZorlandığın soruları ve sevdiğin özetleri favorilere ekle. Bir soruyu görsel olarak, testi metin olarak arkadaşlarınla paylaş.\n\n🔒 GİZLİLİK\nGoogle veya Apple hesabınla giriş yaparsın. Belgelerin, testlerin ve favorilerin yalnızca telefonunda tutulur. Hesabını istediğin zaman uygulamanın içinden silebilirsin.\n\nUygulama ücretsizdir; belge hazırlanmadan önce bir reklam gösterir.",
+  "supportUrl": "https://sviappdeveloper-sketch.github.io/yukle-detayla/destek.html",
+  "marketingUrl": "https://sviappdeveloper-sketch.github.io/yukle-detayla/",
+  "privacyPolicyUrl": "https://sviappdeveloper-sketch.github.io/yukle-detayla/gizlilik.html",
+  "copyright": "2026 Seyfullah Sivi",
+  "primaryCategory": "EDUCATION",
+  "secondaryCategory": "PRODUCTIVITY",
+  "contentRights": "DOES_NOT_USE_THIRD_PARTY_CONTENT",
+  "review": {
+    "contactFirstName": "Seyfullah",
+    "contactLastName": "Sivi",
+    "contactEmail": "sviapp.developer@gmail.com",
+    "contactPhone": "",
+    "demoAccountRequired": false,
+    "notes": "Yükle Detayla turns a user's own study PDF (or photos of notebook/book pages) into a summary and multiple-choice tests (20 questions each). Sign-in: Sign in with Apple or Google (Firebase Authentication); no demo account is needed, please use Sign in with Apple. Account deletion: gear icon (⚙️) on the main screen → 'Hesabımı sil' (deletes the Firebase account, revokes the Apple token and erases all local data). How to test: sign in → 'Dosya Yükle' → choose any PDF (or take a photo of a printed page) → keep 'Özet' checked, choose 1 test → 'Oluştur'. Generation takes about 20–60 seconds. Then open the summary or the test; after answering, the hint shows the source page and 'Kaynağa git' opens that page. Processing: the document text is sent over HTTPS to our Cloudflare Worker, which forwards it to the Google Gemini API and returns the result; nothing is stored on the server. Documents, tests and favorites are stored only on the device. Ads: Google AdMob interstitial before a document is generated, with the UMP consent form where required; the App Tracking Transparency prompt appears about 1 second after launch, before any ads load. No in-app purchases, no content shared between users."
+  },
+  "screenshots": {
+    "APP_IPHONE_67": [
+      "app-store/ios/1-ana.png",
+      "app-store/ios/4-test.png",
+      "app-store/ios/3-ozet.png",
+      "app-store/ios/5-kaynak.png",
+      "app-store/ios/2-yukle.png",
+      "app-store/ios/6-karisik.png"
+    ]
+  }
+}

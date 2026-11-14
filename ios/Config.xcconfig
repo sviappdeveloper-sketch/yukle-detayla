@@ -1,0 +1,11 @@
+// Yükle Detayla iOS ayarları (xcconfig'te "//" yorum başlatır; adreslerdeki "//" için $() kullanılır)
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+PRODUCT_BUNDLE_IDENTIFIER = com.mobihome.yukledetayla
+
+// Firebase → iOS uygulaması → GoogleService-Info.plist içindeki REVERSED_CLIENT_ID
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.BURAYA-IOS-CLIENT
+
+// AdMob → Yükle Detayla (iOS). Google'ın test kimlikleri (3940256099942544) yazılırsa uygulama reklamsız çalışır.
+YD_ADMOB_APP_ID = ca-app-pub-3940256099942544~1458002511
+YD_AD_INTERSTITIAL = ca-app-pub-3940256099942544/4411468910

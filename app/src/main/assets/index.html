@@ -167,7 +167,9 @@ const APP_NAME = 'Yükle Detayla';
 const LINKS = Object.assign({
   web: 'https://sviappdeveloper-sketch.github.io/yukle-detayla/',
   play: 'https://play.google.com/store/apps/details?id=com.mobihome.yukledetayla',
-  appstore: ''
+  appstore: '',
+  privacy: 'https://sviappdeveloper-sketch.github.io/yukle-detayla/gizlilik.html',
+  support: 'https://sviappdeveloper-sketch.github.io/yukle-detayla/destek.html'
 }, (window.APP_CONFIG && window.APP_CONFIG.links) || {});
 const TEST_FOCUS = [
   'temel kavramlar ve tanımlar (kolay)',
@@ -439,7 +441,7 @@ V.login = () => `
       <svg viewBox="0 0 24 24" fill="#fff"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.3.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.7-1-2.6-4zM13.9 5c.7-.9 1.2-2 1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5z"/></svg>
       Apple ile giriş yap</button>
     <div id="loginErr" class="err-box hidden"></div>
-    <p class="muted small" style="margin-top:14px">Uygulama yalnızca üyelere açıktır. Giriş yaparak kullanım koşullarını kabul etmiş olursun.</p>
+    <p class="muted small" style="margin-top:14px">Uygulama yalnızca üyelere açıktır. Giriş yaparak <a href="${LINKS.privacy}" style="color:inherit">gizlilik politikasını</a> kabul etmiş olursun.</p>
   </div>`;
 
 function allQuestions(){
@@ -714,7 +716,9 @@ function profileSheet(){
   const u = META.user||{};
   openModal(`<div class="row" style="margin-bottom:12px"><div class="avatar">${u.photo?`<img src="${esc(u.photo)}">`:esc((u.name||'?')[0])}</div><div><b>${esc(u.name||'Kullanıcı')}</b><div class="muted small">${esc(u.email||'')}${u.provider?` · ${esc(u.provider)}`:''}</div></div></div>
     <button class="btn ghost block" data-act="shareApp" style="margin-bottom:8px">📣 Uygulamayı paylaş</button>
-    <button class="btn ghost block" data-act="signout">Çıkış yap</button>`);
+    <button class="btn ghost block" data-act="signout" style="margin-bottom:8px">Çıkış yap</button>
+    <button class="btn ghost block" data-act="deleteAsk" style="color:var(--bad);border-color:var(--bad)">Hesabımı sil</button>
+    <p class="small muted" style="text-align:center;margin:12px 0 0"><a href="${LINKS.privacy}" style="color:inherit">Gizlilik politikası</a> · <a href="${LINKS.support}" style="color:inherit">Destek</a></p>`);
 }
 
 // ================= Paylaşım =================
@@ -798,6 +802,12 @@ const ACT = {
   },
   profile: () => profileSheet(),
   signout: async () => { closeModal(); try{ NATIVE && NATIVE.signOut && NATIVE.signOut(); }catch(e){} META.user=null; await saveMeta(); STACK.length=0; go('login'); },
+  deleteAsk: () => openModal(`<b>Hesabın silinsin mi?</b><p class="muted small">Hesabın ve bu telefondaki tüm belgelerin, özetlerin, testlerin ve favorilerin kalıcı olarak silinir. Bu işlem geri alınamaz.</p><div class="row"><button class="btn" style="background:var(--bad)" data-act="deleteYes">Kalıcı olarak sil</button><button class="btn ghost" data-act="closeModal">Vazgeç</button></div>`),
+  deleteYes: async () => {
+    closeModal();
+    if(NATIVE && NATIVE.deleteAccount){ toast('Hesap siliniyor…'); NATIVE.deleteAccount(); return; }
+    await wipeLocal(); toast('Hesap silindi');
+  },
   shareApp: () => { closeModal(); doShare({text: shareText('')}); },
   upload: () => go('upload'),
   summaries: () => go('summaries'),
@@ -891,6 +901,16 @@ window.onNativeAuth = async function(json){
   else { const err=$('#loginErr'); if(err){ err.textContent = (u && u.error) || 'Giriş yapılamadı. Tekrar dene.'; err.classList.remove('hidden'); } document.querySelectorAll('.sso').forEach(b=>b.disabled=false); }
 };
 window.onNativeToast = msg => toast(msg);
+async function wipeLocal(){
+  for(const d of DOCS){ await DB.del('docs', d.id); await DB.del('files', d.id); }
+  DOCS = []; META = { favQ:[], favS:[], user:null }; await saveMeta(); MIX=null; JOB.active=null;
+  STACK.length=0; go('login');
+}
+window.onNativeDeleted = async function(json){
+  let r={}; try{ r = typeof json==='string' ? JSON.parse(json) : (json||{}); }catch(e){}
+  if(r.ok){ await wipeLocal(); toast('Hesabın silindi'); }
+  else toast(r.error || 'Hesap silinemedi. Tekrar dene.');
+};
 
 // ================= Başlangıç =================
 (async () => {
