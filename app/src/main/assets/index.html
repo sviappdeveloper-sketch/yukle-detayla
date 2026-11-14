@@ -346,7 +346,8 @@ const TESTS_PROMPT = (src, idxs, avoid) => `Sen deneyimli bir Türk öğretmensi
 ${idxs.length} ayrı test yaz, her birinde TAM OLARAK ${PER_TEST} soru olsun:
 ${idxs.map(t=>`- Test ${t+1}: ${TEST_FOCUS[t]}`).join('\n')}
 Kurallar:
-- Her sorunun 4 şıkkı (A-D), yalnızca biri doğru; doğru şıkkın yeri dağınık olsun.
+- Her sorunun 4 şıkkı (A-D), yalnızca biri doğru. Gerçek sınavlardaki gibi doğru cevaplar A, B, C, D arasında dengeli dağılsın; aynı şık art arda gelmesin.
+- Yanlış şıklar (çeldiriciler) mantıklı ve doğru cevapla benzer uzunlukta olsun.
 - Sorular yalnızca belgedeki bilgilere dayansın; testler arasında aynı soruyu tekrar etme.
 - "aciklama": doğru cevabın neden doğru olduğunu 1-2 cümleyle anlat.
 - "sayfa": cevabın bulunduğu sayfa numarası.
@@ -356,6 +357,28 @@ YALNIZCA şu biçimde geçerli JSON döndür:
 ("testler" dizisinde ${idxs.length} eleman olsun. "dogru" 0'dan başlayan şık sırasıdır.)
 
 ${docBlock(src)}`;
+// Gerçek sınavlardaki gibi: doğru cevaplar şıklara eşit dağılır, aynı şık art arda en fazla 2 kez gelir.
+// "Hepsi / Hiçbiri" gibi sıraya bağlı şıkları olan sorulara dokunulmaz.
+const FIXED_OPT = /(hepsi|hiçbiri|hicbiri|yukarıdakiler|hiçbir|her ikisi|i ve ii|ii ve iii|i, ii)/i;
+function balanceAnswers(qs){
+  const n = qs.length; if(!n) return qs;
+  const k = Math.min(4, Math.max(2, Math.min(...qs.map(q=>q.secenekler.length))));
+  for(let attempt=0; attempt<200; attempt++){
+    const pos=[]; for(let i=0;i<n;i++) pos.push(i%k);
+    for(let i=n-1;i>0;i--){ const r=Math.floor(Math.random()*(i+1)); [pos[i],pos[r]]=[pos[r],pos[i]]; }
+    let ok=true; for(let i=2;i<n;i++) if(pos[i]===pos[i-1] && pos[i]===pos[i-2]){ ok=false; break; }
+    if(!ok && attempt<199) continue;
+    qs.forEach((q,i)=>{
+      if(q.secenekler.some(o=>FIXED_OPT.test(o))) return;
+      const target = Math.min(pos[i], q.secenekler.length-1);
+      if(target===q.dogru) return;
+      const s=q.secenekler.slice(); [s[target], s[q.dogru]] = [s[q.dogru], s[target]];
+      q.secenekler = s; q.dogru = target;
+    });
+    return qs;
+  }
+  return qs;
+}
 function cleanQs(arr, maxPage){
   return (arr||[]).filter(q => q && q.soru && Array.isArray(q.secenekler) && q.secenekler.length>=2).slice(0,PER_TEST)
     .map(q => { const pg = parseInt(q.sayfa,10); return { soru:String(q.soru), secenekler:q.secenekler.slice(0,5).map(String), dogru: Math.max(0, Math.min(q.secenekler.length-1, parseInt(q.dogru,10)||0)), aciklama:String(q.aciklama||''), sayfa: (pg>=1 && pg<=maxPage) ? pg : null, alinti: String(q.alinti||'') }; });
@@ -390,7 +413,7 @@ async function runJob(job){
         try{
           const r = await ask(TESTS_PROMPT(src, g, avoid), src.images, signal, wait);
           const tests = r.testler || r.tests || (r.sorular?[r]:[]);
-          const out = g.map((t,i)=>cleanQs(tests[i] && (tests[i].sorular||tests[i].questions||tests[i]), doc.pages));
+          const out = g.map((t,i)=>balanceAnswers(cleanQs(tests[i] && (tests[i].sorular||tests[i].questions||tests[i]), doc.pages)));
           if(out.some(a=>a.length<5)) throw new Error('Yeterli soru üretilemedi');
           got = out;
         }catch(e){ if(signal.aborted) return; lastErr=e; if(e && (e.code==='rate_limited'||e.code==='not_granted')) break; }
