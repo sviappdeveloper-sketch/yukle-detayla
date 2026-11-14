@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>934726019565-e87pk6kvsbtv3vd61qtn4o84lth1fej1.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.934726019565-e87pk6kvsbtv3vd61qtn4o84lth1fej1</string>
+	<key>API_KEY</key>
+	<string>AIzaSyBQ77bPYLPZb2aWpo5_tjaJM2cHATYI6g4</string>
+	<key>GCM_SENDER_ID</key>
+	<string>934726019565</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.mobihome.yukledetayla</string>
+	<key>PROJECT_ID</key>
+	<string>yukle-detayla</string>
+	<key>STORAGE_BUCKET</key>
+	<string>yukle-detayla.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:934726019565:ios:bae3273e30ebe1357e5fe4</string>
+</dict>
+</plist>

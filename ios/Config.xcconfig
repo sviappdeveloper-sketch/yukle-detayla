@@ -4,7 +4,7 @@ CURRENT_PROJECT_VERSION = 1
 PRODUCT_BUNDLE_IDENTIFIER = com.mobihome.yukledetayla
 
 // Firebase → iOS uygulaması → GoogleService-Info.plist içindeki REVERSED_CLIENT_ID
-GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.BURAYA-IOS-CLIENT
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.934726019565-e87pk6kvsbtv3vd61qtn4o84lth1fej1
 
 // AdMob → Yükle Detayla (iOS). Google'ın test kimlikleri (3940256099942544) yazılırsa uygulama reklamsız çalışır.
 YD_ADMOB_APP_ID = ca-app-pub-3940256099942544~1458002511
