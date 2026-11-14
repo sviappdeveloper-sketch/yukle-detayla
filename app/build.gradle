@@ -1,4 +1,13 @@
 plugins { id 'com.android.application' }
+// Firebase ayar dosyası varsa Google Services eklentisini uygula
+if (file('google-services.json').exists()) {
+  apply plugin: 'com.google.gms.google-services'
+}
+
+// AdMob kimlikleri (gerçek kimlikler gelince burası değişecek; şu an Google'ın test kimlikleri)
+def ADMOB_APP_ID = 'ca-app-pub-3940256099942544~3347511713'
+def ADMOB_INTERSTITIAL_ID = 'ca-app-pub-3940256099942544/1033173712'
+
 android {
   namespace 'com.mobihome.yukledetayla'
   compileSdk 35
@@ -6,10 +15,33 @@ android {
     applicationId "com.mobihome.yukledetayla"
     minSdk 24
     targetSdk 35
-    versionCode 1
-    versionName "1.0"
+    versionCode 2
+    versionName "1.1"
+    manifestPlaceholders = [admobAppId: ADMOB_APP_ID]
+    buildConfigField "String", "ADMOB_INTERSTITIAL_ID", "\"${ADMOB_INTERSTITIAL_ID}\""
   }
-  buildTypes { release { minifyEnabled false } }
+  signingConfigs {
+    // Sabit imza: Google girişinin SHA-1 parmak izi her derlemede aynı kalsın
+    fixed {
+      storeFile file('yd-debug.keystore')
+      storePassword 'yukledetayla'
+      keyAlias 'yukledetayla'
+      keyPassword 'yukledetayla'
+    }
+  }
+  buildTypes {
+    debug { signingConfig signingConfigs.fixed }
+    release { minifyEnabled false; signingConfig signingConfigs.fixed }
+  }
+  buildFeatures { buildConfig true }
   compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
-dependencies { implementation 'androidx.core:core:1.13.1' }
+dependencies {
+  implementation 'androidx.core:core:1.13.1'
+  implementation platform('com.google.firebase:firebase-bom:33.7.0')
+  implementation 'com.google.firebase:firebase-auth'
+  implementation 'androidx.credentials:credentials:1.3.0'
+  implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
+  implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
+  implementation 'com.google.android.gms:play-services-ads:23.6.0'
+}

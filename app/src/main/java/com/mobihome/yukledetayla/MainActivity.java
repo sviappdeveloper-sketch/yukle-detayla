@@ -6,18 +6,52 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.provider.MediaStore;
+import android.util.Base64;
+import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.WebResourceRequest;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.GetCredentialException;
+
+import com.google.android.gms.ads.AdError;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.FullScreenContentCallback;
+import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.interstitial.InterstitialAd;
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.GoogleAuthProvider;
+import com.google.firebase.auth.OAuthProvider;
+import com.google.firebase.auth.UserInfo;
+
+import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.util.Arrays;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
     private static final int REQ_FILE = 1001;
@@ -26,6 +60,8 @@ public class MainActivity extends Activity {
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
     private Uri cameraUri;
+    private InterstitialAd interstitial;
+    private final Executor bg = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,9 +72,11 @@ public class MainActivity extends Activity {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
+        s.setDatabaseEnabled(true);
         s.setAllowFileAccess(true);
         s.setAllowContentAccess(true);
-        s.setMediaPlaybackRequiresUserGesture(true);
+
+        web.addJavascriptInterface(new Bridge(), "Android");
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -46,7 +84,6 @@ public class MainActivity extends Activity {
                 Uri u = request.getUrl();
                 String scheme = u.getScheme();
                 if ("http".equals(scheme) || "https".equals(scheme)) {
-                    // Dış bağlantıları tarayıcıda aç
                     try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
                     return true;
                 }
@@ -59,45 +96,220 @@ public class MainActivity extends Activity {
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = callback;
-
                 String[] accept = params.getAcceptTypes();
                 boolean wantsImage = false, wantsPdf = false;
-                if (accept != null) {
-                    for (String a : accept) {
-                        if (a == null) continue;
-                        if (a.startsWith("image")) wantsImage = true;
-                        if (a.contains("pdf")) wantsPdf = true;
-                    }
+                if (accept != null) for (String a : accept) {
+                    if (a == null) continue;
+                    if (a.startsWith("image")) wantsImage = true;
+                    if (a.contains("pdf")) wantsPdf = true;
                 }
-
-                // Kamera ile fotoğraf çek
-                if (params.isCaptureEnabled() && wantsImage) {
-                    if (openCamera()) return true;
-                }
-
+                if (params.isCaptureEnabled() && wantsImage && openCamera()) return true;
                 Intent i = new Intent(Intent.ACTION_GET_CONTENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
-                if (wantsPdf) i.setType("application/pdf");
-                else if (wantsImage) i.setType("image/*");
-                else i.setType("*/*");
-                if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
-                    i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-                }
+                i.setType(wantsPdf ? "application/pdf" : wantsImage ? "image/*" : "*/*");
+                if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
                 try {
                     startActivityForResult(Intent.createChooser(i, wantsPdf ? "PDF seç" : "Fotoğraf seç"), REQ_FILE);
                 } catch (ActivityNotFoundException e) {
                     fileCallback.onReceiveValue(null);
                     fileCallback = null;
-                    Toast.makeText(MainActivity.this, "Dosya seçici bulunamadı", Toast.LENGTH_SHORT).show();
                     return false;
                 }
                 return true;
             }
         });
 
+        // Reklamlar
+        try {
+            MobileAds.initialize(this, status -> loadInterstitial());
+        } catch (Throwable ignored) {}
+
+        // Apple girişi yarıda kaldıysa sonucu al
+        try {
+            FirebaseAuth auth = FirebaseAuth.getInstance();
+            if (auth.getPendingAuthResult() != null) {
+                auth.getPendingAuthResult()
+                        .addOnSuccessListener(r -> sendUser(r.getUser(), "Apple"))
+                        .addOnFailureListener(e -> sendError("Apple girişi tamamlanamadı."));
+            }
+        } catch (Throwable ignored) {}
+
         web.loadUrl("file:///android_asset/index.html");
     }
 
+    // ===================== Giriş =====================
+    private FirebaseAuth auth() {
+        try { return FirebaseAuth.getInstance(); } catch (Throwable t) { return null; }
+    }
+
+    private void signInGoogle() {
+        FirebaseAuth auth = auth();
+        int resId = getResources().getIdentifier("default_web_client_id", "string", getPackageName());
+        if (auth == null || resId == 0) { sendError("Giriş sistemi henüz ayarlanmadı (Firebase)."); return; }
+        GetSignInWithGoogleOption option = new GetSignInWithGoogleOption.Builder(getString(resId)).build();
+        GetCredentialRequest request = new GetCredentialRequest.Builder().addCredentialOption(option).build();
+        CredentialManager cm = CredentialManager.create(this);
+        cm.getCredentialAsync(this, request, new CancellationSignal(), bg,
+                new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                    @Override
+                    public void onResult(GetCredentialResponse response) {
+                        Credential c = response.getCredential();
+                        if (c instanceof CustomCredential && GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(c.getType())) {
+                            try {
+                                GoogleIdTokenCredential g = GoogleIdTokenCredential.createFrom(c.getData());
+                                AuthCredential ac = GoogleAuthProvider.getCredential(g.getIdToken(), null);
+                                runOnUiThread(() -> auth.signInWithCredential(ac)
+                                        .addOnSuccessListener(r -> sendUser(r.getUser(), "Google"))
+                                        .addOnFailureListener(e -> sendError("Google girişi başarısız: " + e.getMessage())));
+                            } catch (Exception e) {
+                                sendError("Google girişi okunamadı.");
+                            }
+                        } else {
+                            sendError("Beklenmeyen giriş türü.");
+                        }
+                    }
+
+                    @Override
+                    public void onError(@NonNull GetCredentialException e) {
+                        if (e instanceof GetCredentialCancellationException) sendError("Giriş iptal edildi.");
+                        else sendError("Google girişi yapılamadı: " + e.getMessage());
+                    }
+                });
+    }
+
+    private void signInApple() {
+        FirebaseAuth auth = auth();
+        if (auth == null) { sendError("Giriş sistemi henüz ayarlanmadı (Firebase)."); return; }
+        OAuthProvider.Builder pb = OAuthProvider.newBuilder("apple.com");
+        pb.setScopes(Arrays.asList("email", "name"));
+        pb.addCustomParameter("locale", "tr");
+        auth.startActivityForSignInWithProvider(this, pb.build())
+                .addOnSuccessListener(r -> sendUser(r.getUser(), "Apple"))
+                .addOnFailureListener(e -> sendError("Apple girişi yapılamadı: " + e.getMessage()));
+    }
+
+    private String userJson(FirebaseUser u, String provider) {
+        if (u == null) return "";
+        try {
+            JSONObject o = new JSONObject();
+            o.put("uid", u.getUid());
+            String name = u.getDisplayName();
+            String email = u.getEmail();
+            if (provider == null) {
+                provider = "";
+                for (UserInfo info : u.getProviderData()) {
+                    if ("google.com".equals(info.getProviderId())) provider = "Google";
+                    if ("apple.com".equals(info.getProviderId())) provider = "Apple";
+                    if ((name == null || name.isEmpty()) && info.getDisplayName() != null) name = info.getDisplayName();
+                    if ((email == null || email.isEmpty()) && info.getEmail() != null) email = info.getEmail();
+                }
+            }
+            o.put("name", name == null || name.isEmpty() ? (email != null ? email.split("@")[0] : "Kullanıcı") : name);
+            o.put("email", email == null ? "" : email);
+            o.put("photo", u.getPhotoUrl() == null ? "" : u.getPhotoUrl().toString());
+            o.put("provider", provider);
+            return o.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private void sendUser(FirebaseUser u, String provider) {
+        String json = userJson(u, provider);
+        js("window.onNativeAuth && window.onNativeAuth(" + JSONObject.quote(json) + ")");
+    }
+
+    private void sendError(String msg) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("error", msg);
+            js("window.onNativeAuth && window.onNativeAuth(" + JSONObject.quote(o.toString()) + ")");
+        } catch (Exception ignored) {}
+    }
+
+    private void js(String code) {
+        runOnUiThread(() -> web.evaluateJavascript(code, null));
+    }
+
+    // ===================== Reklam =====================
+    private void loadInterstitial() {
+        runOnUiThread(() -> {
+            try {
+                InterstitialAd.load(this, BuildConfig.ADMOB_INTERSTITIAL_ID, new AdRequest.Builder().build(),
+                        new InterstitialAdLoadCallback() {
+                            @Override public void onAdLoaded(@NonNull InterstitialAd ad) { interstitial = ad; }
+                            @Override public void onAdFailedToLoad(@NonNull LoadAdError e) { interstitial = null; }
+                        });
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    private void showInterstitial() {
+        runOnUiThread(() -> {
+            if (interstitial == null) { loadInterstitial(); return; }
+            InterstitialAd ad = interstitial;
+            interstitial = null;
+            ad.setFullScreenContentCallback(new FullScreenContentCallback() {
+                @Override public void onAdDismissedFullScreenContent() { loadInterstitial(); }
+                @Override public void onAdFailedToShowFullScreenContent(@NonNull AdError e) { loadInterstitial(); }
+            });
+            ad.show(this);
+        });
+    }
+
+    // ===================== Paylaşım =====================
+    private void shareImage(String b64, String text) {
+        try {
+            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+            File dir = new File(getCacheDir(), "share");
+            if (!dir.exists()) dir.mkdirs();
+            File f = new File(dir, "yukle-detayla-soru.png");
+            try (FileOutputStream out = new FileOutputStream(f)) { out.write(bytes); }
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".files", f);
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("image/png");
+            send.putExtra(Intent.EXTRA_STREAM, uri);
+            if (text != null && !text.isEmpty()) send.putExtra(Intent.EXTRA_TEXT, text);
+            send.setClipData(ClipData.newRawUri("", uri));
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            runOnUiThread(() -> startActivity(Intent.createChooser(send, "Soruyu paylaş")));
+        } catch (Exception e) {
+            runOnUiThread(() -> Toast.makeText(this, "Paylaşılamadı", Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    private void shareText(String text) {
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_TEXT, text);
+        runOnUiThread(() -> startActivity(Intent.createChooser(send, "Paylaş")));
+    }
+
+    // ===================== JavaScript köprüsü =====================
+    private class Bridge {
+        @JavascriptInterface public void signIn(String provider) {
+            runOnUiThread(() -> { if ("apple".equals(provider)) signInApple(); else signInGoogle(); });
+        }
+        @JavascriptInterface public void signOut() {
+            FirebaseAuth a = auth();
+            if (a != null) a.signOut();
+            try { CredentialManager.create(MainActivity.this).clearCredentialStateAsync(
+                    new androidx.credentials.ClearCredentialStateRequest(), new CancellationSignal(), bg,
+                    new CredentialManagerCallback<Void, androidx.credentials.exceptions.ClearCredentialException>() {
+                        @Override public void onResult(Void v) {}
+                        @Override public void onError(@NonNull androidx.credentials.exceptions.ClearCredentialException e) {}
+                    }); } catch (Throwable ignored) {}
+        }
+        @JavascriptInterface public String getUser() {
+            FirebaseAuth a = auth();
+            return a == null ? "" : userJson(a.getCurrentUser(), null);
+        }
+        @JavascriptInterface public void showInterstitial() { MainActivity.this.showInterstitial(); }
+        @JavascriptInterface public void shareImage(String b64, String text) { MainActivity.this.shareImage(b64, text); }
+        @JavascriptInterface public void shareText(String text) { MainActivity.this.shareText(text); }
+    }
+
+    // ===================== Dosya / kamera =====================
     private boolean openCamera() {
         try {
             File dir = new File(getCacheDir(), "camera");
@@ -140,7 +352,6 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        // Önce sayfanın kendi geri işlemini dene (testten özete, özetten ana ekrana)
         web.evaluateJavascript("(window.appBack && window.appBack()) ? 'y' : 'n'", value -> {
             if (value == null || !value.contains("y")) MainActivity.super.onBackPressed();
         });
