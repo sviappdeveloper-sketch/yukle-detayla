@@ -367,6 +367,27 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void shareFile(String b64, String mime, String name, String text) {
+        try {
+            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+            File dir = new File(getCacheDir(), "share");
+            if (!dir.exists()) dir.mkdirs();
+            String safe = (name == null || name.isEmpty()) ? "yukle-detayla.pdf" : name.replaceAll("[^\\p{L}\\p{N}._-]", "-");
+            File f = new File(dir, safe);
+            try (FileOutputStream out = new FileOutputStream(f)) { out.write(bytes); }
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".files", f);
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType(mime == null || mime.isEmpty() ? "application/pdf" : mime);
+            send.putExtra(Intent.EXTRA_STREAM, uri);
+            if (text != null && !text.isEmpty()) send.putExtra(Intent.EXTRA_TEXT, text);
+            send.setClipData(ClipData.newRawUri("", uri));
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            runOnUiThread(() -> startActivity(Intent.createChooser(send, "Testi paylaş")));
+        } catch (Exception e) {
+            runOnUiThread(() -> Toast.makeText(this, "Paylaşılamadı", Toast.LENGTH_SHORT).show());
+        }
+    }
+
     private void shareText(String text) {
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("text/plain");
@@ -397,6 +418,7 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void deleteAccount() { runOnUiThread(MainActivity.this::deleteAccount); }
         @JavascriptInterface public void shareImage(String b64, String text) { MainActivity.this.shareImage(b64, text); }
         @JavascriptInterface public void shareText(String text) { MainActivity.this.shareText(text); }
+        @JavascriptInterface public void shareFile(String b64, String mime, String name, String text) { MainActivity.this.shareFile(b64, mime, name, text); }
     }
 
     // ===================== Dosya / kamera =====================

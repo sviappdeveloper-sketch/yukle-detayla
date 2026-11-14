@@ -75,7 +75,8 @@ final class AppViewController: UIViewController {
         deleteAccount: function(){ post({a:'deleteAccount'}); },
         showInterstitial: function(){ post({a:'ad'}); },
         shareImage: function(b, t){ post({a:'shareImage', b:String(b), t:String(t||'')}); },
-        shareText: function(t){ post({a:'shareText', t:String(t||'')}); }
+        shareText: function(t){ post({a:'shareText', t:String(t||'')}); },
+        shareFile: function(b, m, n, t){ post({a:'shareFile', b:String(b), m:String(m||''), n:String(n||''), t:String(t||'')}); }
       };
     })();
     """
@@ -112,6 +113,15 @@ final class AppViewController: UIViewController {
       share(items)
     case "shareText":
       share([body["t"] as? String ?? ""])
+    case "shareFile":
+      guard let d = Data(base64Encoded: body["b"] as? String ?? "", options: .ignoreUnknownCharacters) else { return }
+      let raw = (body["n"] as? String) ?? "yukle-detayla.pdf"
+      let name = raw.isEmpty ? "yukle-detayla.pdf" : raw.replacingOccurrences(of: "/", with: "-")
+      let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+      do { try d.write(to: url, options: .atomic) } catch { return }
+      var items: [Any] = [url]
+      if let t = body["t"] as? String, !t.isEmpty { items.append(t) }
+      share(items)
     default: break
     }
   }

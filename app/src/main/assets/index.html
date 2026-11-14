@@ -123,6 +123,8 @@ html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,syst
 .qnav button.cur{border-color:var(--pri);box-shadow:0 0 0 2px color-mix(in srgb,var(--pri) 35%,transparent)}
 .qnav button.ok{background:var(--okbg);border-color:var(--ok)}
 .qnav button.bad{background:var(--badbg);border-color:var(--bad)}
+.qnav button.rev{background:color-mix(in srgb,var(--acc) 18%,transparent);border-color:var(--acc)}
+.reveal{margin-top:10px;width:100%;background:transparent;border:1.5px dashed var(--acc);color:var(--ink);border-radius:12px;padding:10px;font:inherit;font-weight:800;cursor:pointer}
 .qhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .qhead>div{display:flex}
 .qtext{font-weight:800;font-size:1.08rem;margin:4px 0 12px}
@@ -590,7 +592,7 @@ V.doc = ({id}) => {
     <div class="item" data-act="openPage" data-id="${d.id}" data-p="1"><div class="ic">📄</div><div class="grow"><div class="t">Belgeyi görüntüle</div><div class="s">Sayfa sayfa gez</div></div><span>›</span></div>
   </div>`;
 };
-function testScore(d,t){ const qs=d.tests[t]||[], a=(d.answers||{})[t]||{}; let c=0,n=0; qs.forEach((q,i)=>{ if(a[i]!==undefined){ n++; if(a[i]===q.dogru) c++; } }); return {c,n,total:qs.length}; }
+function testScore(d,t){ const qs=d.tests[t]||[], a=(d.answers||{})[t]||{}; let c=0,n=0,r=0; qs.forEach((q,i)=>{ if(a[i]!==undefined){ n++; if(a[i]===-1) r++; else if(a[i]===q.dogru) c++; } }); return {c,n,r,w:n-c-r,total:qs.length}; }
 function testItem(d,t){ const s=testScore(d,t); return `<div class="item" data-act="openTest" data-id="${d.id}" data-t="${t}"><div class="ic">🧪</div><div class="grow"><div class="t">Test ${t+1}</div><div class="s">${esc(TEST_FOCUS[t]||'')} · ${s.n?`${s.c}/${s.total} doğru`:`${s.total} soru`}</div></div><span>›</span></div>`; }
 
 // ---- Özetler / Testler listeleri ----
@@ -629,10 +631,10 @@ V.test = ({id,t}) => {
   const qs = d.tests[t]; const a = d.answers[t] || (d.answers[t]={});
   let i = Math.min(qs.length-1, Math.max(0, d.progress[t]||0));
   const sc = testScore(d,t);
-  const nav = qs.map((q,k)=>{ const st = a[k]===undefined?'':(a[k]===q.dogru?'ok':'bad'); return `<button class="${st} ${k===i?'cur':''}" data-act="qgo" data-k="${k}">${k+1}</button>`; }).join('');
+  const nav = qs.map((q,k)=>{ const st = a[k]===undefined?'':(a[k]===-1?'rev':(a[k]===q.dogru?'ok':'bad')); return `<button class="${st} ${k===i?'cur':''}" data-act="qgo" data-k="${k}">${k+1}</button>`; }).join('');
   const finished = sc.n===sc.total;
   return `${topbar(`Test ${+t+1} · ${docTitle(d)}`, `<button class="iconbtn" data-act="shareTest" data-id="${id}" data-t="${t}" aria-label="Testi paylaş">📤</button>`)}
-  <div class="row between" style="margin-bottom:6px"><span class="muted small">${esc(TEST_FOCUS[t]||'')}</span><b>${sc.c} doğru · ${sc.n-sc.c} yanlış</b></div>
+  <div class="row between" style="margin-bottom:6px"><span class="muted small">${esc(TEST_FOCUS[t]||'')}</span><b>${sc.c} doğru · ${sc.w} yanlış${sc.r?` · ${sc.r} bakıldı`:''}</b></div>
   <div class="qnav">${nav}</div>
   ${finished?`<div class="card" style="text-align:center"><div class="muted small">Test bitti</div><div class="score-big">%${Math.round(sc.c/sc.total*100)}</div><div class="row" style="justify-content:center"><button class="btn ghost" data-act="resetTest" data-id="${id}" data-t="${t}">↺ Yeniden çöz</button></div></div>`:''}
   ${questionCard(d, t, i, a[i], 'test')}`;
@@ -641,7 +643,9 @@ function questionCard(d, t, i, chosen, mode){
   const q = d.tests[t][i]; const answered = chosen!==undefined && chosen!==null;
   const fav = META.favQ.includes(qKey(d,t,i));
   const opts = q.secenekler.map((o,j)=>{ let c='opt'; if(answered){ if(j===q.dogru) c+=' ok'; else if(j===chosen) c+=' bad'; } return `<button class="${c}" data-act="answer" data-mode="${mode}" data-id="${d.id}" data-t="${t}" data-i="${i}" data-o="${j}" ${answered?'disabled':''}><b>${LETTERS[j]})</b><span>${esc(o)}</span></button>`; }).join('');
-  const hint = answered ? `<div class="hint"><div class="verdict">${chosen===q.dogru?'✅ Doğru!':'❌ Yanlış. Doğru cevap: '+LETTERS[q.dogru]}</div>${esc(q.aciklama)}
+  const verdict = chosen===-1 ? '👀 Doğru cevap: '+LETTERS[q.dogru] : (chosen===q.dogru?'✅ Doğru!':'❌ Yanlış. Doğru cevap: '+LETTERS[q.dogru]);
+  const revealBtn = answered ? '' : `<button class="reveal" data-act="answer" data-mode="${mode}" data-id="${d.id}" data-t="${t}" data-i="${i}" data-o="-1">👀 Cevabı gör</button>`;
+  const hint = answered ? `<div class="hint"><div class="verdict">${verdict}</div>${esc(q.aciklama)}
       ${q.alinti?`<div class="quote">“${esc(q.alinti)}”</div>`:''}
       ${q.sayfa?`<button class="pagelink" data-act="openPage" data-id="${d.id}" data-p="${q.sayfa}" data-quote="${esc(q.alinti)}">📄 Kaynağa git · Sayfa ${q.sayfa}</button>`:''}</div>` : '';
   const total = d.tests[t].length;
@@ -649,7 +653,7 @@ function questionCard(d, t, i, chosen, mode){
     <div class="qhead"><span class="muted small">${mode==='test'?`Soru ${i+1}/${total}`:esc(docTitle(d))+` · Test ${+t+1}`}</span>
       <div><button class="iconbtn star ${fav?'on':''}" data-act="favQ" data-id="${d.id}" data-t="${t}" data-i="${i}" aria-label="Favori">${fav?'★':'☆'}</button><button class="iconbtn" data-act="shareQ" data-id="${d.id}" data-t="${t}" data-i="${i}" aria-label="Soruyu paylaş">📤</button></div></div>
     <div class="qtext">${esc(q.soru)}</div>
-    <div class="opts">${opts}</div>${hint}
+    <div class="opts">${opts}</div>${revealBtn}${hint}
     ${mode==='test'?`<div class="qfoot"><button class="btn ghost" data-act="qgo" data-k="${i-1}" ${i===0?'disabled':''}>← Önceki</button><button class="btn" data-act="qgo" data-k="${i+1}" ${i===total-1?'disabled':''}>Sonraki →</button></div>`:''}
     ${mode==='mixed'?`<div class="qfoot"><button class="btn" data-act="mixedNext">${answered?'Sonraki soru →':'Atla →'}</button></div>`:''}
   </div>`;
@@ -771,7 +775,17 @@ async function questionImage(q, d){
   return c.toDataURL('image/png');
 }
 function shareText(extra){ return `${extra?extra+'\n\n':''}📚 ${APP_NAME} — PDF'ini yükle, özetini oku, testlerle çalış.\n📲 İndir: ${LINKS.web}`; }
-async function doShare({text, image, title}){
+async function doShare({text, image, title, file}){
+  if(file){
+    if(NATIVE && NATIVE.shareFile){ NATIVE.shareFile(await blobToB64(file.blob), file.mime, file.name, text||''); return; }
+    try{
+      const f = new File([file.blob], file.name, {type:file.mime});
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[f]})){ await navigator.share({files:[f], title:title||APP_NAME, text}); return; }
+    }catch(e){ if(e && e.name==='AbortError') return; }
+    const u = URL.createObjectURL(file.blob);
+    openModal(`<b>${esc(file.name)}</b><p class="muted small">Bu görünümde doğrudan paylaşım yok. PDF'i aşağıdaki bağlantıdan açıp kaydedebilirsin.</p><a class="btn block" href="${u}" target="_blank" rel="noopener">📄 PDF'i aç</a>`);
+    return;
+  }
   if(NATIVE && NATIVE.shareImage && image){ NATIVE.shareImage(image.split(',')[1], text||''); return; }
   if(NATIVE && NATIVE.shareText){ NATIVE.shareText(text||''); return; }
   try{
@@ -782,6 +796,76 @@ async function doShare({text, image, title}){
     }
   }catch(e){ if(e && e.name==='AbortError') return; }
   openModal(`<b>Paylaş</b>${image?`<img src="${image}" style="margin:10px 0" alt="Paylaşım görseli"><div class="muted small">Görsele uzun basıp kaydedebilirsin.</div>`:''}<textarea style="width:100%;height:120px;margin-top:10px;border-radius:12px;border:1px solid var(--line);padding:10px;font:inherit;background:var(--bg);color:var(--ink)" readonly>${esc(text)}</textarea><button class="btn block" style="margin-top:8px" data-act="copyShare">Metni kopyala</button>`);
+}
+// ---- Testi PDF olarak hazırla (sayfalar tuvale çizilir, JPEG olarak PDF'e konur; Türkçe harfler sorunsuz) ----
+function safeName(s){ return String(s).replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,40) || 'Test'; }
+async function testPdf(d,t){
+  try{ await document.fonts.ready; }catch(e){}
+  const qs = d.tests[t]; const W=1240, H=1754, M=100, CW=W-2*M;
+  const pages=[]; let c,x,y,pageNo=0;
+  const FONT='Nunito, Arial, sans-serif';
+  function newPage(){
+    c=document.createElement('canvas'); c.width=W; c.height=H; x=c.getContext('2d');
+    x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+    pageNo++;
+    // üst bilgi
+    x.fillStyle='#2f5d50'; x.fillRect(0,0,W,120);
+    x.fillStyle='#fff'; x.font=`900 40px ${FONT}`; x.fillText('📚 '+APP_NAME, M, 76);
+    x.font=`700 26px ${FONT}`; x.textAlign='right'; x.fillText(`${docTitle(d).slice(0,40)} · Test ${t+1}`, W-M, 74); x.textAlign='left';
+    // alt bilgi
+    x.fillStyle='#6b7080'; x.font=`600 22px ${FONT}`; x.fillText(`${APP_NAME} ile hazırlandı · ${LINKS.web}`, M, H-50);
+    x.textAlign='right'; x.fillText(String(pageNo), W-M, H-50); x.textAlign='left';
+    y=190; pages.push(c);
+  }
+  function need(h){ if(y+h > H-110) newPage(); }
+  newPage();
+  x.fillStyle='#1f2430'; x.font=`900 46px ${FONT}`; x.fillText(`${docTitle(d)}`.slice(0,45), M, y); y+=50;
+  x.fillStyle='#6b7080'; x.font=`600 26px ${FONT}`; x.fillText(`Test ${t+1} · ${qs.length} soru · ${TEST_FOCUS[t]||''}`, M, y); y+=30;
+  x.fillText('Ad Soyad: ____________________________     Puan: ______', M, y+40); y+=100;
+  qs.forEach((q,i)=>{
+    x.font=`800 30px ${FONT}`; const ql = wrapLines(x, `${i+1}. ${q.soru}`, CW);
+    x.font=`500 28px ${FONT}`; const ol = q.secenekler.map((o,j)=>wrapLines(x, `${LETTERS[j]}) ${o}`, CW-40));
+    const h = ql.length*40 + ol.reduce((s,l)=>s+l.length*38,0) + 40;
+    need(h);
+    x.fillStyle='#1f2430'; x.font=`800 30px ${FONT}`; ql.forEach(l=>{ x.fillText(l, M, y); y+=40; });
+    x.font=`500 28px ${FONT}`; ol.forEach(lines=>{ lines.forEach(l=>{ x.fillText(l, M+40, y); y+=38; }); });
+    y+=30;
+  });
+  // cevap anahtarı
+  newPage();
+  x.fillStyle='#1f2430'; x.font=`900 42px ${FONT}`; x.fillText('Cevap Anahtarı', M, y); y+=60;
+  x.font=`700 32px ${FONT}`;
+  const cols=4, colW=CW/cols;
+  qs.forEach((q,i)=>{ const col=i%cols, row=Math.floor(i/cols); x.fillText(`${i+1}. ${LETTERS[q.dogru]}`, M+col*colW, y+row*52); });
+  y += Math.ceil(qs.length/cols)*52 + 30;
+  x.font=`600 26px ${FONT}`; x.fillStyle='#6b7080';
+  wrapLines(x, 'Açıklamalar ve cevapların geçtiği sayfalar Yükle Detayla uygulamasında.', CW).forEach(l=>{ x.fillText(l, M, y); y+=36; });
+  // PDF dosyası
+  const jpgs = [];
+  for(const pg of pages){ const b = await new Promise(r=>pg.toBlob(r,'image/jpeg',0.85)); jpgs.push(new Uint8Array(await b.arrayBuffer())); }
+  return makePdf(jpgs, W, H);
+}
+function makePdf(jpgs, iw, ih){
+  const enc = new TextEncoder(); const parts=[]; const offs=[]; let len=0;
+  const push = p => { const b = typeof p==='string' ? enc.encode(p) : p; parts.push(b); len+=b.length; };
+  const PW=595.28, PH=841.89; const n=jpgs.length;
+  // nesneler: 1 katalog, 2 sayfalar, her sayfa için: sayfa, içerik, görüntü
+  const pageObj = k => 3+k*3, contObj = k => 4+k*3, imgObj = k => 5+k*3;
+  push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+  const obj = (id, body) => { offs[id]=len; push(`${id} 0 obj\n`); body(); push('\nendobj\n'); };
+  obj(1, ()=>push('<< /Type /Catalog /Pages 2 0 R >>'));
+  obj(2, ()=>push(`<< /Type /Pages /Count ${n} /Kids [${jpgs.map((_,k)=>`${pageObj(k)} 0 R`).join(' ')}] >>`));
+  jpgs.forEach((j,k)=>{
+    obj(pageObj(k), ()=>push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 ${imgObj(k)} 0 R >> >> /Contents ${contObj(k)} 0 R >>`));
+    const cs = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`;
+    obj(contObj(k), ()=>{ push(`<< /Length ${cs.length} >>\nstream\n`); push(cs); push('\nendstream'); });
+    obj(imgObj(k), ()=>{ push(`<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${j.length} >>\nstream\n`); push(j); push('\nendstream'); });
+  });
+  const total = 3 + n*3; const xref = len;
+  let x = `xref\n0 ${total}\n0000000000 65535 f \n`;
+  for(let i=1;i<total;i++) x += String(offs[i]).padStart(10,'0') + ' 00000 n \n';
+  push(x); push(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return new Blob(parts, {type:'application/pdf'});
 }
 function testShareText(d,t){
   const qs = d.tests[t];
@@ -834,7 +918,7 @@ const ACT = {
   answer: async el => {
     const {mode,id} = el.dataset; const t=+el.dataset.t, i=+el.dataset.i, o=+el.dataset.o; const d=docById(id);
     if(mode==='test'){ if(d.answers[t][i]!==undefined) return; d.answers[t][i]=o; await saveDoc(d); }
-    else if(mode==='mixed'){ if(MIX.ans[MIX.pos]!==undefined) return; MIX.ans[MIX.pos]=o; MIX.n++; if(o===d.tests[t][i].dogru) MIX.c++; }
+    else if(mode==='mixed'){ if(MIX.ans[MIX.pos]!==undefined) return; MIX.ans[MIX.pos]=o; if(o!==-1){ MIX.n++; if(o===d.tests[t][i].dogru) MIX.c++; } }
     else { cur().params.chosen=o; }
     const y=window.scrollY; render(); window.scrollTo(0,y);
   },
@@ -844,7 +928,7 @@ const ACT = {
   favS: async el => { const id=el.dataset.id; const ix=META.favS.indexOf(id); if(ix>=0) META.favS.splice(ix,1); else { META.favS.unshift(id); toast('Favorilere eklendi ⭐'); } await saveMeta(); render(); },
   favTab: el => { favTab=el.dataset.v; render(); },
   shareQ: async el => { const d=docById(el.dataset.id); const q=d.tests[+el.dataset.t][+el.dataset.i]; toast('Görsel hazırlanıyor…'); const img = await questionImage(q,d); doShare({image:img, text: shareText('🤔 Bu soruyu çözebilir misin?'), title:'Soru'}); },
-  shareTest: el => { const d=docById(el.dataset.id); doShare({text: shareText(testShareText(d,+el.dataset.t)), title:`Test ${+el.dataset.t+1}`}); },
+  shareTest: async el => { const d=docById(el.dataset.id); const t=+el.dataset.t; toast('PDF hazırlanıyor…'); try{ const blob = await testPdf(d,t); const name = `${safeName(docTitle(d))}-Test-${t+1}.pdf`; doShare({file:{blob, mime:'application/pdf', name}, text: shareText(`📝 ${docTitle(d)} — Test ${t+1}`), title:`Test ${t+1}`}); }catch(e){ doShare({text: shareText(testShareText(d,t)), title:`Test ${t+1}`}); } },
   shareSummary: el => { const d=docById(el.dataset.id); const s=d.summary; const ak=(s.akilda_kal||[]).map(x=>'• '+(typeof x==='string'?x:x.bilgi)).join('\n'); doShare({text: shareText(`📝 ${s.baslik||d.name}\n\n${s.genel||''}${ak?`\n\n⭐ Akılda kalsın:\n${ak}`:''}`), title:'Özet'}); },
   copyShare: async () => { const ta=$('#modalRoot textarea'); try{ await navigator.clipboard.writeText(ta.value); toast('Kopyalandı'); }catch(e){ ta.select(); toast('Metni seçip kopyala'); } },
 };
