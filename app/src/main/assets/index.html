@@ -489,8 +489,10 @@ V.login = () => `
     <button class="linkbtn" data-act="demoOpen">E-posta ile giriş</button>
     <div id="demoForm" class="demo-form hidden">
       <input id="demoUser" type="email" placeholder="E-posta" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="username">
-      <input id="demoPass" type="password" placeholder="Şifre" autocomplete="current-password">
-      <button class="btn block" data-act="demoIn">Giriş yap</button>
+      <input id="demoPass" type="password" placeholder="Şifre (en az 6 karakter)" autocomplete="current-password">
+      <button class="btn block" data-act="emailGo" data-k="in">Giriş yap</button>
+      <button class="btn ghost block" data-act="emailGo" data-k="up">Yeni üyelik aç</button>
+      <button class="linkbtn small" data-act="emailGo" data-k="forgot">Şifremi unuttum</button>
     </div>
     <div id="loginErr" class="err-box hidden"></div>
     <p class="muted small" style="margin-top:14px">Uygulama yalnızca üyelere açıktır. Giriş yaparak <a href="${LINKS.privacy}" style="color:inherit">gizlilik politikasını</a> kabul etmiş olursun.</p>
@@ -934,13 +936,24 @@ const ACT = {
     META.user = { uid:'preview', name: p==='google'?'Önizleme Kullanıcısı':'Apple Kullanıcısı', email:'', provider: p==='google'?'Google':'Apple' };
     await saveMeta(); go('home',{},true); toast('Önizleme modu: giriş simüle edildi');
   },
-  // E-posta ile giriş: App Store / Google Play inceleme ekibi için demo hesabı (hesap bu cihazda tutulur)
+  // E-posta ile giriş: e-posta ve şifreyle üyelik (Firebase). İnceleme ekibinin demo hesabı bu cihazda tutulur.
   demoOpen: () => { $('#demoForm').classList.toggle('hidden'); $('#loginErr').classList.add('hidden'); if(!$('#demoForm').classList.contains('hidden')) $('#demoUser').focus(); },
-  demoIn: async () => {
-    const u = $('#demoUser').value.trim().toLowerCase(), p = $('#demoPass').value, err = $('#loginErr');
-    if(sha256(u+':'+p) !== DEMO_HASH){ err.textContent = 'E-posta ya da şifre hatalı.'; err.classList.remove('hidden'); return; }
-    META.user = { uid:'demo', name:'Demo Kullanıcı', email:u, photo:'', provider:'Demo' };
-    await saveMeta(); STACK.length=0; go('home');
+  emailGo: async (el) => {
+    const k = el.dataset.k, u = $('#demoUser').value.trim().toLowerCase(), p = $('#demoPass').value, err = $('#loginErr');
+    const fail = m => { err.textContent = m; err.classList.remove('hidden'); };
+    err.classList.add('hidden');
+    if(!u || u.indexOf('@') < 1) return fail('Geçerli bir e-posta yaz.');
+    if(k !== 'forgot' && p.length < 6) return fail('Şifre en az 6 karakter olmalı.');
+    if(k === 'in' && sha256(u+':'+p) === DEMO_HASH){
+      META.user = { uid:'demo', name:'Demo Kullanıcı', email:u, photo:'', provider:'Demo' };
+      await saveMeta(); STACK.length=0; go('home'); return;
+    }
+    if(NATIVE && NATIVE.emailAuth){ el.disabled = true; setTimeout(()=>{ el.disabled=false; }, 4000); NATIVE.emailAuth(k, u, p); return; }
+    if(NATIVE) return fail('E-posta ile giriş için uygulamayı güncelle.');
+    // Önizleme modu (claude.ai): gerçek giriş yok
+    if(k === 'forgot') return toast('Önizleme modu: e-posta gönderilmez');
+    META.user = { uid:'preview', name:u.split('@')[0], email:u, provider:'E-posta' };
+    await saveMeta(); go('home',{},true); toast('Önizleme modu: giriş simüle edildi');
   },
   profile: () => profileSheet(),
   signout: async () => { closeModal(); try{ NATIVE && NATIVE.signOut && NATIVE.signOut(); }catch(e){} META.user=null; await saveMeta(); STACK.length=0; go('login'); },
@@ -1041,6 +1054,11 @@ window.onNativeAuth = async function(json){
   let u=null; try{ u = typeof json==='string' ? JSON.parse(json) : json; }catch(e){}
   if(u && u.uid){ META.user=u; await saveMeta(); STACK.length=0; go('home'); }
   else { const err=$('#loginErr'); if(err){ err.textContent = (u && u.error) || 'Giriş yapılamadı. Tekrar dene.'; err.classList.remove('hidden'); } document.querySelectorAll('.sso').forEach(b=>b.disabled=false); }
+};
+window.onNativeReset = function(json){
+  let r={}; try{ r = typeof json==='string' ? JSON.parse(json) : (json||{}); }catch(e){}
+  if(r.ok){ toast('Şifre yenileme bağlantısı e-postana gönderildi'); return; }
+  const err=$('#loginErr'); if(err){ err.textContent = r.error || 'İşlem yapılamadı. Tekrar dene.'; err.classList.remove('hidden'); }
 };
 window.onNativeToast = msg => toast(msg);
 async function wipeLocal(){

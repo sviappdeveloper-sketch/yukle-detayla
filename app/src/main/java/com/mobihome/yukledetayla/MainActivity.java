@@ -40,6 +40,7 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
@@ -212,6 +213,54 @@ public class MainActivity extends Activity {
                 .addOnFailureListener(e -> sendError("Apple girişi yapılamadı: " + e.getMessage()));
     }
 
+    // ===================== E-posta ve şifre =====================
+    private void emailAuth(String kind, String email, String pass) {
+        FirebaseAuth a = auth();
+        if (a == null) { sendError("Giriş sistemi henüz ayarlanmadı (Firebase)."); return; }
+        if ("forgot".equals(kind)) {
+            a.sendPasswordResetEmail(email)
+                    .addOnSuccessListener(v -> sendReset(true, null))
+                    .addOnFailureListener(e -> sendReset(false, emailErr(e)));
+            return;
+        }
+        if ("up".equals(kind)) {
+            a.createUserWithEmailAndPassword(email, pass)
+                    .addOnSuccessListener(r -> sendUser(r.getUser(), "E-posta"))
+                    .addOnFailureListener(e -> sendError(emailErr(e)));
+        } else {
+            a.signInWithEmailAndPassword(email, pass)
+                    .addOnSuccessListener(r -> sendUser(r.getUser(), "E-posta"))
+                    .addOnFailureListener(e -> sendError(emailErr(e)));
+        }
+    }
+
+    private String emailErr(Exception e) {
+        String code = e instanceof FirebaseAuthException ? ((FirebaseAuthException) e).getErrorCode() : e.getClass().getSimpleName();
+        switch (code) {
+            case "ERROR_INVALID_EMAIL": return "Geçerli bir e-posta yaz.";
+            case "ERROR_WEAK_PASSWORD": return "Şifre en az 6 karakter olmalı.";
+            case "ERROR_EMAIL_ALREADY_IN_USE":
+            case "ERROR_CREDENTIAL_ALREADY_IN_USE": return "Bu e-posta ile zaten üyelik var. Giriş yap.";
+            case "ERROR_WRONG_PASSWORD":
+            case "ERROR_USER_NOT_FOUND":
+            case "ERROR_INVALID_CREDENTIAL":
+            case "ERROR_INVALID_LOGIN_CREDENTIALS": return "E-posta ya da şifre hatalı.";
+            case "ERROR_OPERATION_NOT_ALLOWED": return "E-posta ile giriş şu an kapalı.";
+            case "FirebaseTooManyRequestsException": return "Çok fazla deneme. Biraz sonra tekrar dene.";
+            case "FirebaseNetworkException": return "İnternet bağlantını kontrol et.";
+            default: return "İşlem yapılamadı. Tekrar dene. (" + code + ")";
+        }
+    }
+
+    private void sendReset(boolean ok, String err) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("ok", ok);
+            if (!ok) o.put("error", err == null ? "İşlem yapılamadı." : err);
+            js("window.onNativeReset && window.onNativeReset(" + JSONObject.quote(o.toString()) + ")");
+        } catch (Exception ignored) {}
+    }
+
     // ===================== Hesap silme =====================
     private void deleteAccount() {
         FirebaseAuth a = auth();
@@ -230,7 +279,10 @@ public class MainActivity extends Activity {
                                     .addOnSuccessListener(r -> deleteNow())
                                     .addOnFailureListener(err -> { pendingDelete = false; sendDeleted(false, err.getMessage()); });
                         } else {
-                            signInGoogle();
+                            boolean google = false;
+                            for (UserInfo info : u.getProviderData()) if ("google.com".equals(info.getProviderId())) google = true;
+                            if (google) signInGoogle();
+                            else { pendingDelete = false; sendDeleted(false, "Güvenlik için çıkış yapıp yeniden giriş yap, sonra hesabını tekrar sil."); }
                         }
                     } else {
                         sendDeleted(false, e.getMessage());
@@ -278,6 +330,7 @@ public class MainActivity extends Activity {
             if (provider == null) {
                 provider = "";
                 for (UserInfo info : u.getProviderData()) {
+                    if ("password".equals(info.getProviderId()) && provider.isEmpty()) provider = "E-posta";
                     if ("google.com".equals(info.getProviderId())) provider = "Google";
                     if ("apple.com".equals(info.getProviderId())) provider = "Apple";
                     if ((name == null || name.isEmpty()) && info.getDisplayName() != null) name = info.getDisplayName();
@@ -416,6 +469,9 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void showInterstitial() { MainActivity.this.showInterstitial(); }
         @JavascriptInterface public void deleteAccount() { runOnUiThread(MainActivity.this::deleteAccount); }
+        @JavascriptInterface public void emailAuth(String kind, String email, String pass) {
+            runOnUiThread(() -> MainActivity.this.emailAuth(kind, email, pass));
+        }
         @JavascriptInterface public void shareImage(String b64, String text) { MainActivity.this.shareImage(b64, text); }
         @JavascriptInterface public void shareText(String text) { MainActivity.this.shareText(text); }
         @JavascriptInterface public void shareFile(String b64, String mime, String name, String text) { MainActivity.this.shareFile(b64, mime, name, text); }

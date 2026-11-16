@@ -77,6 +77,7 @@ final class AppViewController: UIViewController {
         signOut: function(){ window.__YD_USER=''; post({a:'signOut'}); },
         getUser: function(){ return window.__YD_USER || ''; },
         deleteAccount: function(){ post({a:'deleteAccount'}); },
+        emailAuth: function(k, e, p){ post({a:'emailAuth', k:String(k), e:String(e), p:String(p||'')}); },
         showInterstitial: function(){ post({a:'ad'}); },
         shareImage: function(b, t){ post({a:'shareImage', b:String(b), t:String(t||'')}); },
         shareText: function(t){ post({a:'shareText', t:String(t||'')}); },
@@ -107,6 +108,8 @@ final class AppViewController: UIViewController {
       GIDSignIn.sharedInstance.signOut()
     case "deleteAccount":
       deleteAccount()
+    case "emailAuth":
+      emailAuth(kind: body["k"] as? String ?? "in", email: body["e"] as? String ?? "", pass: body["p"] as? String ?? "")
     case "ad":
       showInterstitial()
     case "shareImage":
@@ -148,6 +151,7 @@ final class AppViewController: UIViewController {
     var email = u.email ?? ""
     for info in u.providerData {
       if provider == nil {
+        if info.providerID == "password", prov.isEmpty { prov = "E-posta" }
         if info.providerID == "google.com" { prov = "Google" }
         if info.providerID == "apple.com" { prov = "Apple" }
       }
@@ -179,6 +183,43 @@ final class AppViewController: UIViewController {
     let s = (try? JSONSerialization.data(withJSONObject: o)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     if ok { js("window.__YD_USER='';") }
     js("window.onNativeDeleted && window.onNativeDeleted(\(Self.jsString(s)));")
+  }
+
+  // ---------------- e-posta ve şifre ----------------
+  private func emailAuth(kind: String, email: String, pass: String) {
+    guard firebaseReady else { sendError("Giriş sistemi henüz ayarlanmadı (Firebase)."); return }
+    if kind == "forgot" {
+      Auth.auth().sendPasswordReset(withEmail: email) { [weak self] error in
+        guard let self = self else { return }
+        if let error = error { self.sendReset(ok: false, error: Self.emailErr(error)) } else { self.sendReset(ok: true) }
+      }
+      return
+    }
+    let done: (AuthDataResult?, Error?) -> Void = { [weak self] result, error in
+      guard let self = self else { return }
+      if let error = error { self.sendError(Self.emailErr(error)); return }
+      self.sendUser(result?.user, provider: "E-posta")
+    }
+    if kind == "up" { Auth.auth().createUser(withEmail: email, password: pass, completion: done) }
+    else { Auth.auth().signIn(withEmail: email, password: pass, completion: done) }
+  }
+  private func sendReset(ok: Bool, error: String = "") {
+    let o: [String: Any] = ok ? ["ok": true] : ["ok": false, "error": error]
+    let s = (try? JSONSerialization.data(withJSONObject: o)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    js("window.onNativeReset && window.onNativeReset(\(Self.jsString(s)));")
+  }
+  static func emailErr(_ error: Error) -> String {
+    let code = (error as NSError).code
+    switch code {
+    case 17008: return "Geçerli bir e-posta yaz."
+    case 17026: return "Şifre en az 6 karakter olmalı."
+    case 17007, 17025: return "Bu e-posta ile zaten üyelik var. Giriş yap."
+    case 17004, 17009, 17011: return "E-posta ya da şifre hatalı."
+    case 17006: return "E-posta ile giriş şu an kapalı."
+    case 17010: return "Çok fazla deneme. Biraz sonra tekrar dene."
+    case 17020: return "İnternet bağlantını kontrol et."
+    default: return "İşlem yapılamadı. Tekrar dene. (\(code))"
+    }
   }
 
   // ---------------- Google ----------------
@@ -254,6 +295,11 @@ final class AppViewController: UIViewController {
     user.delete { [weak self] error in
       guard let self = self else { return }
       if let e = error as NSError?, e.code == 17014 {   // requiresRecentLogin
+        if !user.providerData.contains(where: { $0.providerID == "google.com" }) {   // e-posta üyeliği
+          self.pending = .none
+          self.sendDeleted(ok: false, error: "Güvenlik için çıkış yapıp yeniden giriş yap, sonra hesabını tekrar sil.")
+          return
+        }
         self.startGoogle()   // yeniden doğrula, sonra sil
         return
       }
