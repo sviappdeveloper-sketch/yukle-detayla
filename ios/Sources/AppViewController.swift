@@ -32,6 +32,10 @@ final class AppViewController: UIViewController {
   private enum Pending { case none, signIn, deleteAccount }
   private var pending: Pending = .none
   private var currentNonce: String?
+  // Apple girişi: denetleyici istek bitene kadar tutulur; pencere hiç açılmadan "iptal" dönerse bir kez yeniden denenir
+  private var appleController: ASAuthorizationController?
+  private var appleStartedAt = Date.distantPast
+  private var appleRetried = false
 
   override var preferredStatusBarStyle: UIStatusBarStyle { .default }
 
@@ -201,6 +205,10 @@ final class AppViewController: UIViewController {
   // ---------------- Apple ----------------
   private func startApple() {
     guard firebaseReady else { finishAuth(error: "Giriş sistemi henüz ayarlanmadı (Firebase)."); return }
+    appleRetried = false
+    performApple()
+  }
+  private func performApple() {
     let nonce = Self.randomNonce()
     currentNonce = nonce
     let req = ASAuthorizationAppleIDProvider().createRequest()
@@ -209,6 +217,8 @@ final class AppViewController: UIViewController {
     let c = ASAuthorizationController(authorizationRequests: [req])
     c.delegate = self
     c.presentationContextProvider = self
+    appleController = c
+    appleStartedAt = Date()
     c.performRequests()
   }
 
@@ -354,9 +364,12 @@ extension AppViewController: FullScreenContentDelegate {
 
 extension AppViewController: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
   func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-    view.window ?? ASPresentationAnchor()
+    if let w = view.window { return w }
+    let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }
+    return windows.first(where: { $0.isKeyWindow }) ?? windows.first ?? ASPresentationAnchor()
   }
   func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+    appleController = nil
     guard let cred = authorization.credential as? ASAuthorizationAppleIDCredential,
           let nonce = currentNonce,
           let tokenData = cred.identityToken, let idToken = String(data: tokenData, encoding: .utf8) else {
@@ -367,8 +380,20 @@ extension AppViewController: ASAuthorizationControllerDelegate, ASAuthorizationC
     useCredential(fc, provider: "Apple", appleAuthCode: code)
   }
   func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-    let cancelled = (error as? ASAuthorizationError)?.code == .canceled
-    finishAuth(error: cancelled ? "Giriş iptal edildi." : "Apple girişi yapılamadı: \(error.localizedDescription)")
+    appleController = nil
+    let ns = error as NSError
+    let cancelled = ns.domain == ASAuthorizationErrorDomain && ns.code == ASAuthorizationError.Code.canceled.rawValue
+    // Giriş penceresi açılmadan (1 sn içinde) "iptal" dönerse kullanıcı iptal etmemiştir: bir kez yeniden dene
+    if cancelled && !appleRetried && Date().timeIntervalSince(appleStartedAt) < 1.0 {
+      appleRetried = true
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self] in self?.performApple() }
+      return
+    }
+    if cancelled && Date().timeIntervalSince(appleStartedAt) < 1.0 {
+      finishAuth(error: "Apple ile giriş penceresi açılamadı. Ayarlar'da Apple Hesabına giriş yapıldığını kontrol edip tekrar dene.")
+      return
+    }
+    finishAuth(error: cancelled ? "Giriş iptal edildi." : "Apple girişi yapılamadı (\(ns.code)): \(error.localizedDescription)")
   }
 }
 
