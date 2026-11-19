@@ -157,6 +157,13 @@ def surum_metinleri():
     l = next((x for x in locs if x["attributes"]["locale"] == LOC), None)
     if l:
         call("PATCH", f"/appStoreVersionLocalizations/{l['id']}", {"data": {"type": "appStoreVersionLocalizations", "id": l["id"], "attributes": attrs}})
+        # "Bu sürümdeki yenilikler": ilk sürümde Apple kabul etmez, sonraki sürümlerde zorunludur
+        if META.get("whatsNew"):
+            try:
+                call("PATCH", f"/appStoreVersionLocalizations/{l['id']}", {"data": {"type": "appStoreVersionLocalizations", "id": l["id"], "attributes": {"whatsNew": META["whatsNew"]}}}, quiet=True)
+                print("   yenilikler yazıldı")
+            except urllib.error.HTTPError:
+                print("   (ilk sürüm: yenilikler alanı kullanılmıyor)")
     else:
         l = call("POST", "/appStoreVersionLocalizations", {"data": {"type": "appStoreVersionLocalizations",
                  "attributes": {"locale": LOC, **attrs},
