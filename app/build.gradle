@@ -17,7 +17,7 @@ android {
     targetSdk 36
     // Codemagic her derlemede BUILD_NUMBER verir; mağaza için her zaman artan sürüm kodu
     versionCode 10 + Integer.parseInt(System.getenv("BUILD_NUMBER") ?: "0")
-    versionName "1.1"
+    versionName "1.2"
     manifestPlaceholders = [admobAppId: ADMOB_APP_ID]
     buildConfigField "String", "ADMOB_INTERSTITIAL_ID", "\"${ADMOB_INTERSTITIAL_ID}\""
   }

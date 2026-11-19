@@ -147,8 +147,37 @@ html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Nunito,syst
 .score-big{font-size:2.2rem;font-weight:900}
 
 /* PDF görüntüleyici */
-.viewer canvas,.viewer img{width:100%;height:auto;border-radius:10px;border:1px solid var(--line);background:#fff;display:block}
+.viewer{overflow:auto;touch-action:pan-x pan-y;border-radius:10px;border:1px solid var(--line);background:#fff;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.viewer #zin{min-width:100%}
+.viewer canvas,.viewer img{width:100%;height:auto;background:#fff;display:block;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .vquote{margin-bottom:10px}
+.zoombar{display:flex;align-items:center;justify-content:center;gap:6px;margin:0 0 8px}
+.zoombar button{width:40px;height:36px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:900;font-size:1.1rem;cursor:pointer}
+.zoombar span{min-width:58px;text-align:center;font-weight:800}
+
+/* Yeni üretim (özet / test) */
+.seg{display:flex;gap:6px;margin-top:8px}
+.seg button{flex:1;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:9px 6px;font:inherit;font-weight:800;cursor:pointer;font-size:.9rem}
+.seg button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.seg button small{display:block;font-weight:600;font-size:.72rem;opacity:.8}
+.actgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.actgrid button{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:12px 6px;font:inherit;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.88rem}
+.actgrid button span{font-size:1.4rem}
+.actgrid button:disabled{opacity:.45}
+.sec-t{font-weight:900;margin:14px 4px 8px}
+.gen{display:flex;align-items:center;gap:12px}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--acc);border-top-color:transparent;animation:spin 1s linear infinite;flex:none}
+.vtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px}
+.vtabs button{flex:none;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 12px;font:inherit;font-weight:800;font-size:.85rem;cursor:pointer}
+.vtabs button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.topic{display:flex;align-items:center;gap:10px;padding:12px;border:1.5px solid var(--line);border-radius:14px;margin-bottom:8px;cursor:pointer;background:var(--card);font-weight:700}
+.topic.on{border-color:var(--pri);background:color-mix(in srgb,var(--pri) 10%,var(--card))}
+.topic .box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;flex:none;font-size:14px;color:#fff}
+.topic.on .box{background:var(--pri);border-color:var(--pri)}
+.topic .grow{flex:1;min-width:0}
+.delbtn{appearance:none;border:0;background:transparent;font-size:1.2rem;width:40px;height:40px;border-radius:10px;cursor:pointer;flex:none}
+.delbtn:active{background:var(--badbg)}
+.tile.full{grid-column:1/-1}
 
 /* Alt sayfa / modal */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:10px}
@@ -339,7 +368,15 @@ function docBlock(src){
 }
 
 // ================= Üretim =================
-const SUMMARY_PROMPT = src => `Sen deneyimli bir Türk öğretmensin. Aşağıdaki belgeyi öğrencinin çalışması için TÜRKÇE özetle. Belge başka dilde olsa bile Türkçe yaz.
+const SUM_KINDS = { normal:'Normal özet', kisa:'Kısa özet', uzun:'Uzun özet', yeni:'Yeni özet' };
+const SUM_STYLE = {
+  normal: 'Dengeli uzunlukta yaz: genel özet 2-4 cümle, her bölüm 3-6 cümle.',
+  kisa: 'KISA ve ÖZ yaz: genel özet 1-2 cümle; en fazla 4 bölüm, her bölüm 1-2 cümle ve en fazla 3 madde; yalnızca en önemli 5 kavram ve 5 akılda kalacak bilgi.',
+  uzun: 'UZUN ve DETAYLI yaz: genel özet 4-6 cümle; belgedeki tüm konuları ayrı bölümlerde ele al, her bölüm 6-10 cümle ve 3-8 madde olsun; tüm önemli kavramları ve 10-15 akılda kalacak bilgiyi yaz. Örnekleri, tarihleri ve sayısal bilgileri atlama.',
+  yeni: 'Dengeli uzunlukta yaz ama önceki özetlerden FARKLI olsun: konuları farklı grupla, farklı ifadeler kullan ve önceki özetlerde öne çıkmayan önemli ayrıntılara da yer ver.'
+};
+const SUMMARY_PROMPT = (src, kind='normal', prev=[]) => `Sen deneyimli bir Türk öğretmensin. Aşağıdaki belgeyi öğrencinin çalışması için TÜRKÇE özetle. Belge başka dilde olsa bile Türkçe yaz.
+${SUM_STYLE[kind]||SUM_STYLE.normal}${prev.length?`\nÖnceki özetlerin bölüm başlıkları (bunları aynen tekrarlama):\n- ${prev.slice(0,40).join('\n- ')}`:''}
 YALNIZCA şu biçimde geçerli JSON döndür:
 {"baslik":"belgenin konusu (kısa)","genel":"2-4 cümlelik genel özet","bolumler":[{"baslik":"alt başlık","ozet":"3-6 cümle","maddeler":["önemli nokta"],"sayfa":3}],"anahtar_kavramlar":[{"kavram":"terim","tanim":"kısa tanım","sayfa":2}],"akilda_kal":[{"bilgi":"sınavda çıkabilecek önemli bilgi","sayfa":4}]}
 "sayfa" bilginin geçtiği sayfa numarasıdır. Uydurma bilgi ekleme.
@@ -360,6 +397,29 @@ YALNIZCA şu biçimde geçerli JSON döndür:
 ("testler" dizisinde ${idxs.length} eleman olsun. "dogru" 0'dan başlayan şık sırasıdır.)
 
 ${docBlock(src)}`;
+// Sonradan istenen tek test: kısa / normal / uzun, isteğe bağlı olarak seçilen konulardan
+const CUSTOM_TEST_PROMPT = (src, {n, topics, avoid}) => `Sen deneyimli bir Türk öğretmensin. Aşağıdaki belgeye dayanarak TÜRKÇE, TAM OLARAK ${n} soruluk çoktan seçmeli bir test hazırla.
+${topics && topics.length ? `Sorular YALNIZCA şu konulardan olsun (konulara dengeli dağıt):\n- ${topics.join('\n- ')}` : 'Sorular belgenin tamamına dengeli dağılsın.'}
+Kolaydan zora karışık sorular yaz.
+Kurallar:
+- Her sorunun 4 şıkkı (A-D), yalnızca biri doğru. Gerçek sınavlardaki gibi doğru cevaplar A, B, C, D arasında dengeli dağılsın; aynı şık art arda gelmesin.
+- Yanlış şıklar (çeldiriciler) mantıklı ve doğru cevapla benzer uzunlukta olsun.
+- Sorular yalnızca belgedeki bilgilere dayansın.
+- "aciklama": doğru cevabın neden doğru olduğunu 1-2 cümleyle anlat.
+- "sayfa": cevabın bulunduğu sayfa numarası.
+- "alinti": o sayfadan cevabı gösteren kısa alıntı (en fazla 25 kelime, belgedeki ifadeyle).${avoid.length?`\nDaha önce sorulmuş şu sorulara BENZEMEYEN yepyeni sorular yaz:\n- ${avoid.slice(-80).join('\n- ')}`:''}
+YALNIZCA şu biçimde geçerli JSON döndür:
+{"sorular":[{"soru":"...","secenekler":["...","...","...","..."],"dogru":0,"aciklama":"...","sayfa":1,"alinti":"..."}]}
+("dogru" 0'dan başlayan şık sırasıdır.)
+
+${docBlock(src)}`;
+const TOPICS_PROMPT = src => `Aşağıdaki belgede işlenen konuları çıkar. Belgedeki sırayla 4-15 konu yaz; konu adları kısa ve TÜRKÇE olsun.
+YALNIZCA şu biçimde geçerli JSON döndür:
+{"konular":[{"baslik":"kısa konu adı","sayfa":1}]}
+("sayfa" konunun ilk geçtiği sayfa numarasıdır.)
+
+${docBlock(src)}`;
+
 // Gerçek sınavlardaki gibi: doğru cevaplar şıklara eşit dağılır, aynı şık art arda en fazla 2 kez gelir.
 // "Hepsi / Hiçbiri" gibi sıraya bağlı şıkları olan sorulara dokunulmaz.
 const FIXED_OPT = /(hepsi|hiçbiri|hicbiri|yukarıdakiler|hiçbir|her ikisi|i ve ii|ii ve iii|i, ii)/i;
@@ -382,8 +442,8 @@ function balanceAnswers(qs){
   }
   return qs;
 }
-function cleanQs(arr, maxPage){
-  return (arr||[]).filter(q => q && q.soru && Array.isArray(q.secenekler) && q.secenekler.length>=2).slice(0,PER_TEST)
+function cleanQs(arr, maxPage, max=PER_TEST){
+  return (arr||[]).filter(q => q && q.soru && Array.isArray(q.secenekler) && q.secenekler.length>=2).slice(0,max)
     .map(q => { const pg = parseInt(q.sayfa,10); return { soru:String(q.soru), secenekler:q.secenekler.slice(0,5).map(String), dogru: Math.max(0, Math.min(q.secenekler.length-1, parseInt(q.dogru,10)||0)), aciklama:String(q.aciklama||''), sayfa: (pg>=1 && pg<=maxPage) ? pg : null, alinti: String(q.alinti||'') }; });
 }
 
@@ -400,8 +460,8 @@ async function runJob(job){
       const si = steps.findIndex(s=>s.key==='sum');
       setStep(si,'run');
       try{
-        const r = await ask(SUMMARY_PROMPT(src), src.images, signal, wait);
-        doc.summary = r; await saveDoc(doc); setStep(si,'done');
+        const r = await ask(SUMMARY_PROMPT(src, job.sumKind||'normal'), src.images, signal, wait);
+        doc.summary = r; doc.summaryKind = job.sumKind||'normal'; await saveDoc(doc); setStep(si,'done');
       }catch(e){ if(signal.aborted) return; setStep(si,'err'); throw e; }
     }
     const groups = []; for(let t=0;t<testCount;t+=3) groups.push([...Array(Math.min(3,testCount-t)).keys()].map(i=>t+i));
@@ -437,6 +497,93 @@ function errText(e){
   if(e && e.code==='rate_limited') return 'Günlük ücretsiz kullanım sınırına ulaşıldı. Daha sonra tekrar dene.';
   if(e && e.code==='not_granted') return 'Yapay zekâ izni verilmedi.';
   return (e && e.message) ? 'Bir sorun oldu: '+e.message : 'Bir sorun oldu.';
+}
+
+// ---- Sonradan üretim: kısa/uzun/yeni özet, kısa/uzun/yeni test, konulara göre test ----
+const GEN = {};            // belge kimliği → {label, ctrl, wait}
+const SRC_CACHE = new Map();
+async function getSrc(doc){
+  if(SRC_CACHE.has(doc.id)) return SRC_CACHE.get(doc.id);
+  const f = await DB.get('files', doc.id);
+  if(!f || doc.fileDeleted) throw new Error('Bu belgenin PDF dosyası silinmiş. Yeni özet veya test için belgeyi tekrar yükle.');
+  const src = f.kind==='images' ? {pages:f.images.length, images:f.images} : await readPdf(f.blob);
+  SRC_CACHE.set(doc.id, src);
+  return src;
+}
+function softRender(){ const c=cur(); if(!c || !['doc','summary','topics','docs'].includes(c.view)) return; const y=window.scrollY; render(); window.scrollTo(0,y); }
+async function generate(doc, label, work){
+  if(GEN[doc.id]){ toast('Bu belgede bir işlem zaten sürüyor'); return false; }
+  if(!(await needAi())){ toast('Yapay zekâ bağlantısı yok.'); return false; }
+  const g = { label, ctrl:new AbortController(), wait:'' };
+  GEN[doc.id] = g; softRender();
+  const wait = s => { g.wait = s ? `Yoğunluk var, ${s} sn sonra tekrar denenecek…` : ''; softRender(); };
+  try{
+    const src = await getSrc(doc);
+    await work(src, g.ctrl.signal, wait);
+    await saveDoc(doc);
+    if(!DOCS.includes(doc)) DOCS.unshift(doc);
+    if(!g.ctrl.signal.aborted) toast(label.replace(/ (hazırlanıyor|çıkarılıyor).*$/,'')+' hazır ✓');
+  }catch(e){
+    if(!g.ctrl.signal.aborted) openModal(`<b>Hazırlanamadı</b><div class="err-box">${esc(errText(e))}</div><button class="btn block" style="margin-top:10px" data-act="closeModal">Tamam</button>`);
+  }finally{
+    delete GEN[doc.id]; softRender();
+  }
+  return true;
+}
+function genCard(d){
+  const g = GEN[d.id]; if(!g) return '';
+  return `<div class="card"><div class="gen"><div class="spin"></div><div style="flex:1"><b>${esc(g.label)}</b><div class="muted small">${esc(g.wait||'Bu işlem bir-iki dakika sürebilir. Bu sırada uygulamayı kullanabilirsin.')}</div></div><button class="btn ghost" style="padding:8px 12px" data-act="genCancel" data-id="${d.id}">İptal</button></div></div>`;
+}
+function allSums(d){
+  if(!d || !d.summary) return [];
+  return [{kind:d.summaryKind||'normal', data:d.summary}, ...(d.sums||[])];
+}
+function sumLabel(d, v){ const list = allSums(d); const s = list[v]; if(!s) return ''; const same = list.slice(0,v).filter(x=>x.kind===s.kind).length; return (SUM_KINDS[s.kind]||'Özet') + (same?` ${same+1}`:''); }
+function prevSectionTitles(d){ const out=[]; allSums(d).forEach(s=>(s.data.bolumler||[]).forEach(b=>b.baslik&&out.push(b.baslik))); return out; }
+function makeSummary(d, kind){
+  return generate(d, `${SUM_KINDS[kind]} hazırlanıyor…`, async (src, signal, wait) => {
+    const r = await ask(SUMMARY_PROMPT(src, kind, kind==='yeni'?prevSectionTitles(d):[]), src.images, signal, wait);
+    if(signal.aborted) return;
+    if(!r || (!r.genel && !(r.bolumler||[]).length)) throw new Error('Özet hazırlanamadı');
+    if(!d.summary){ d.summary = r; d.summaryKind = kind; }
+    else { d.sums = d.sums || []; d.sums.push({kind, created:Date.now(), data:r}); }
+    const c = cur(); if(c && c.view==='summary' && c.params.id===d.id) c.params.v = allSums(d).length-1;
+  });
+}
+const TEST_SIZES = { 10:'Kısa test', 20:'Normal test', 30:'Uzun test' };
+function testLabel(d,t){ const m = d.testMeta && d.testMeta[t]; return (m && m.title) || TEST_FOCUS[t] || ''; }
+function makeTest(d, n, topics){
+  const title = topics && topics.length ? `Konu: ${topics.join(', ')}`.slice(0,90) : `${TEST_SIZES[n]||'Yeni test'} · yeni sorular`;
+  return generate(d, `${topics&&topics.length?'Konu testi':TEST_SIZES[n]||'Test'} (${n} soru) hazırlanıyor…`, async (src, signal, wait) => {
+    const avoid = []; (d.tests||[]).forEach(qs=>(qs||[]).forEach(q=>avoid.push(q.soru.slice(0,90))));
+    let qs = null, lastErr = null;
+    for(let tries=0; tries<2 && !qs; tries++){
+      try{
+        const r = await ask(CUSTOM_TEST_PROMPT(src, {n, topics, avoid}), src.images, signal, wait);
+        const raw = r.sorular || r.questions || (r.testler && r.testler[0] && (r.testler[0].sorular||r.testler[0])) || (Array.isArray(r)?r:[]);
+        const out = balanceAnswers(cleanQs(raw, d.pages, n));
+        if(out.length < Math.min(5,n)) throw new Error('Yeterli soru üretilemedi');
+        qs = out;
+      }catch(e){ if(signal.aborted) return; lastErr = e; if(e && e.code==='rate_limited') break; }
+    }
+    if(!qs) throw lastErr || new Error('Sorular hazırlanamadı');
+    const t = d.tests.length;
+    d.tests[t] = qs; d.answers[t] = {}; d.progress[t] = 0;
+    d.testMeta = d.testMeta || {}; d.testMeta[t] = { title, n, topics: topics||[] };
+  });
+}
+function topicsOf(d){
+  if(d.topics && d.topics.length) return d.topics;
+  return [];
+}
+function loadTopics(d){
+  return generate(d, 'Konular çıkarılıyor…', async (src, signal, wait) => {
+    const r = await ask(TOPICS_PROMPT(src), src.images, signal, wait);
+    if(signal.aborted) return;
+    const list = (r.konular||r.topics||[]).map(k=>typeof k==='string'?{baslik:k}:k).filter(k=>k&&k.baslik).map(k=>({baslik:String(k.baslik).slice(0,80), sayfa:parseInt(k.sayfa,10)||null})).slice(0,20);
+    if(!list.length) throw new Error('Konular bulunamadı');
+    d.topics = list;
+  });
 }
 
 // ================= Gezinme =================
@@ -546,14 +693,15 @@ V.home = () => {
     <button class="tile" data-act="summaries"><div class="ic">📝</div><b>Özetler</b><span>${sumN} özet</span></button>
     <button class="tile" data-act="tests"><div class="ic">🧪</div><b>Testler</b><span>${testsN} test</span></button>
     <button class="tile" data-act="mixed"><div class="ic">🔀</div><b>Karışık Sor</b><span>Tüm testlerden rastgele</span></button>
-    <button class="tile" data-act="favs"><div class="ic">⭐</div><b>Favoriler</b><span>${META.favQ.length} soru · ${META.favS.length} özet</span></button>
+    <button class="tile" data-act="docs"><div class="ic">📁</div><b>Belgelerim</b><span>${DOCS.length} belge · sil, yeni özet/test</span></button>
+    <button class="tile full" data-act="favs"><div class="ic">⭐</div><b>Favoriler</b><span>${META.favQ.length} soru · ${META.favS.length} özet</span></button>
   </div>`;
 };
 function docTitle(d){ return (d.summary && d.summary.baslik) || d.name; }
 
 // ---- Yükleme ----
 let pending = null; // {name, kind, file|images[], thumbs}
-let opts = { summary:true, tests:5 };
+let opts = { summary:true, sumKind:'normal', tests:5 };
 V.upload = () => {
   const job = JOB.active;
   if(job && !job.closed) return jobView(job);
@@ -565,7 +713,10 @@ V.upload = () => {
     </div>
     <div class="card">
       <div style="font-weight:900;margin-bottom:4px">Ne oluşturulsun?</div>
-      <div class="opt-row"><label class="check"><input type="checkbox" id="optSum" ${opts.summary?'checked':''}> 📝 Özet</label><span class="muted small">1 özet</span></div>
+      <div class="opt-row" style="flex-direction:column;align-items:stretch">
+        <div class="row between"><label class="check"><input type="checkbox" id="optSum" ${opts.summary?'checked':''}> 📝 Özet</label><span class="muted small">uzunluğunu seç</span></div>
+        ${opts.summary?`<div class="seg">${['kisa','normal','uzun'].map(k=>`<button class="${opts.sumKind===k?'on':''}" data-act="setSumKind" data-k="${k}">${SUM_KINDS[k].replace(' özet','')}</button>`).join('')}</div>`:''}
+      </div>
       <div class="opt-row" style="flex-direction:column;align-items:stretch">
         <div class="row between"><span class="check">🧪 Test sayısı</span><span class="muted small">her test ${PER_TEST} soru</span></div>
         <div class="count" style="margin-top:8px">${[0,1,2,3,4,5].map(n=>`<button class="${opts.tests===n?'on':''}" data-act="setTests" data-n="${n}">${n}</button>`).join('')}</div>
@@ -603,10 +754,10 @@ function renderJobIfVisible(){ if(cur() && cur().view==='upload') render(); }
 
 async function startCreate(){
   if(!(await needAi())){ const e=$('#upErr'); e.textContent='Yapay zekâ bağlantısı yok.'; e.classList.remove('hidden'); return; }
-  const p = pending; const wantSummary = opts.summary; const testCount = opts.tests;
+  const p = pending; const wantSummary = opts.summary; const testCount = opts.tests; const sumKind = opts.sumKind||'normal';
   const doc = { id: 'd'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name:p.name, kind:p.kind, created:Date.now(), pages:0, summary:null, tests:[], answers:{}, progress:{} };
   const steps = [{key:'read', name: p.kind==='pdf'?'PDF okunuyor':'Fotoğraflar hazırlanıyor'}];
-  if(wantSummary) steps.push({key:'sum', name:'Özet'});
+  if(wantSummary) steps.push({key:'sum', name:SUM_KINDS[sumKind]||'Özet'});
   for(let t=0;t<testCount;t++) steps.push({key:'t'+t, name:`Test ${t+1} (${PER_TEST} soru)`});
   const job = { doc, steps, ctrl:new AbortController(), closed:false };
   JOB.active = job; pending = null;
@@ -628,7 +779,7 @@ async function startCreate(){
     steps[0].st='done'; steps[0].ex=`${src.pages} sayfa`; renderJobIfVisible();
     job.src = src;
   }catch(e){ steps[0].st='err'; job.error = e.message || 'Dosya okunamadı.'; renderJobIfVisible(); return; }
-  job.wantSummary = wantSummary; job.testCount = testCount;
+  job.wantSummary = wantSummary; job.testCount = testCount; job.sumKind = sumKind;
   await runJob(job);
 }
 
@@ -636,44 +787,105 @@ async function startCreate(){
 V.doc = ({id}) => {
   const d = docById(id); if(!d) return `${topbar('Belge')}<div class="empty">Bulunamadı</div>`;
   const tests = (d.tests||[]).map((qs,t)=>qs?testItem(d,t):'').join('');
+  const sums = allSums(d).map((s,v)=>`<div class="item" data-act="openSummary" data-id="${d.id}" data-v="${v}"><div class="ic">📝</div><div class="grow"><div class="t">${esc(sumLabel(d,v))}</div><div class="s">${esc(s.data.baslik||'')}</div></div><span>›</span></div>`).join('');
+  const busy = !!GEN[d.id], noFile = !!d.fileDeleted, dis = (busy||noFile)?'disabled':'';
   return `${topbar(docTitle(d), `<button class="iconbtn" data-act="delDoc" data-id="${d.id}" aria-label="Sil">🗑️</button>`)}
-  <div class="muted small" style="margin:-6px 0 10px">${esc(d.name)} · ${d.pages} sayfa</div>
+  <div class="muted small" style="margin:-6px 0 10px">${esc(d.name)} · ${d.pages} sayfa${noFile?' · PDF silindi':''}</div>
+  ${genCard(d)}
+  ${noFile?`<div class="info-box small" style="margin-bottom:10px">PDF dosyası silindiği için yeni özet veya test çıkarılamaz. Mevcut özet ve testlerin duruyor.</div>`:''}
+  <div class="sec-t">📝 Özetler</div>
+  ${sums?`<div class="list">${sums}</div>`:`<div class="muted small" style="margin:0 4px 8px">Henüz özet yok.</div>`}
+  <div class="actgrid">
+    <button data-act="newSum" data-id="${d.id}" data-k="kisa" ${dis}><span>⚡</span>Kısa özet</button>
+    <button data-act="newSum" data-id="${d.id}" data-k="uzun" ${dis}><span>📖</span>Uzun özet</button>
+    <button data-act="newSum" data-id="${d.id}" data-k="${d.summary?'yeni':'normal'}" ${dis}><span>🔄</span>${d.summary?'Yeni özet':'Normal özet'}</button>
+  </div>
+  <div class="sec-t">🧪 Testler</div>
+  ${tests?`<div class="list">${tests}</div>`:`<div class="muted small" style="margin:0 4px 8px">Henüz test yok.</div>`}
+  <div class="actgrid">
+    <button data-act="newTest" data-id="${d.id}" data-n="10" ${dis}><span>⚡</span>Kısa test<small class="muted">10 soru</small></button>
+    <button data-act="newTest" data-id="${d.id}" data-n="30" ${dis}><span>📚</span>Uzun test<small class="muted">30 soru</small></button>
+    <button data-act="newTest" data-id="${d.id}" data-n="20" ${dis}><span>🔄</span>Yeni test<small class="muted">20 soru</small></button>
+  </div>
+  <button class="btn soft block" style="margin-top:8px" data-act="openTopics" data-id="${d.id}" ${dis}>🧩 Konulara göre test çıkar</button>
+  <div class="sec-t">📄 Belge</div>
   <div class="list">
-    ${d.summary?`<div class="item" data-act="openSummary" data-id="${d.id}"><div class="ic">📝</div><div class="grow"><div class="t">Özet</div><div class="s">${esc(d.summary.baslik||'')}</div></div><span>›</span></div>`:''}
-    ${tests}
-    <div class="item" data-act="openPage" data-id="${d.id}" data-p="1"><div class="ic">📄</div><div class="grow"><div class="t">Belgeyi görüntüle</div><div class="s">Sayfa sayfa gez</div></div><span>›</span></div>
+    ${noFile?'':`<div class="item" data-act="openPage" data-id="${d.id}" data-p="1"><div class="ic">📄</div><div class="grow"><div class="t">Belgeyi görüntüle</div><div class="s">Sayfa sayfa gez · iki parmakla büyüt</div></div><span>›</span></div>`}
+    <div class="item" data-act="delDoc" data-id="${d.id}"><div class="ic" style="background:var(--badbg)">🗑️</div><div class="grow"><div class="t">Sil</div><div class="s">Sadece PDF'i veya belgeyi tamamen sil</div></div><span>›</span></div>
   </div>`;
 };
+
+// ---- Konulara göre test ----
+let TOPSEL = { id:null, set:new Set(), n:20 };
+V.topics = ({id}) => {
+  const d = docById(id); if(!d) return `${topbar('Konular')}<div class="empty">Bulunamadı</div>`;
+  if(TOPSEL.id!==id) TOPSEL = { id, set:new Set(), n:20 };
+  const list = topicsOf(d);
+  if(!list.length){
+    if(!GEN[id] && !d.fileDeleted && !d._topicTried){ d._topicTried = true; setTimeout(()=>loadTopics(d), 0); }
+    return `${topbar('Konulara göre test')}${genCard(d)}${GEN[id]?'':`<div class="empty"><div class="big">🧩</div>Konular bulunamadı.<br><button class="btn" style="margin-top:12px" data-act="reloadTopics" data-id="${id}" ${d.fileDeleted?'disabled':''}>🔄 Konuları çıkar</button></div>`}`;
+  }
+  const sel = TOPSEL.set;
+  return `${topbar('Konulara göre test')}
+  ${genCard(d)}
+  <div class="muted small" style="margin:-4px 4px 10px">Test çıkarmak istediğin bir veya birkaç konuyu seç.</div>
+  <div class="row between" style="margin-bottom:8px"><b style="margin-left:4px">${list.length} konu</b><button class="linkbtn" data-act="topicAll">${sel.size===list.length?'Seçimi kaldır':'Tümünü seç'}</button></div>
+  ${list.map((k,i)=>`<div class="topic ${sel.has(i)?'on':''}" data-act="topicToggle" data-i="${i}"><span class="box">${sel.has(i)?'✓':''}</span><span class="grow">${esc(k.baslik)}</span>${k.sayfa?`<span class="muted small">s.${k.sayfa}</span>`:''}</div>`).join('')}
+  <div class="card" style="margin-top:12px">
+    <b>Soru sayısı</b>
+    <div class="seg">${[10,20,30].map(n=>`<button class="${TOPSEL.n===n?'on':''}" data-act="topicN" data-n="${n}">${n}<small>${TEST_SIZES[n].replace(' test','')}</small></button>`).join('')}</div>
+    <button class="btn block" style="margin-top:12px" data-act="topicCreate" data-id="${id}" ${(!sel.size||GEN[id])?'disabled':''}>✨ Testi oluştur${sel.size?` (${sel.size} konu)`:''}</button>
+  </div>
+  <button class="linkbtn small" data-act="reloadTopics" data-id="${id}" ${(GEN[id]||d.fileDeleted)?'disabled':''}>🔄 Konuları yeniden çıkar</button>`;
+};
+
+// ---- Belgelerim (yüklenen dosyalar) ----
+V.docs = () => {
+  return `${topbar('Belgelerim')}${DOCS.length?`<div class="list">${DOCS.map(d=>`<div class="item" data-act="goDoc" data-id="${d.id}"><div class="ic">${d.kind==='images'?'🖼️':'📄'}</div><div class="grow"><div class="t">${esc(docTitle(d))}</div><div class="s">${esc(d.name)} · ${d.pages} sayfa${d.fileDeleted?' · PDF silindi':''} · ${new Date(d.created).toLocaleDateString('tr-TR')}</div></div><button class="delbtn" data-act="delDoc" data-id="${d.id}" aria-label="Sil">🗑️</button></div>`).join('')}</div>`:emptyBox('📁','Henüz belge yok','Yüklediğin PDF\'ler burada listelenir.')}`;
+};
 function testScore(d,t){ const qs=d.tests[t]||[], a=(d.answers||{})[t]||{}; let c=0,n=0,r=0; qs.forEach((q,i)=>{ if(a[i]!==undefined){ n++; if(a[i]===-1) r++; else if(a[i]===q.dogru) c++; } }); return {c,n,r,w:n-c-r,total:qs.length}; }
-function testItem(d,t){ const s=testScore(d,t); return `<div class="item" data-act="openTest" data-id="${d.id}" data-t="${t}"><div class="ic">🧪</div><div class="grow"><div class="t">Test ${t+1}</div><div class="s">${esc(TEST_FOCUS[t]||'')} · ${s.n?`${s.c}/${s.total} doğru`:`${s.total} soru`}</div></div><span>›</span></div>`; }
+function testItem(d,t){ const s=testScore(d,t); return `<div class="item" data-act="openTest" data-id="${d.id}" data-t="${t}"><div class="ic">🧪</div><div class="grow"><div class="t">Test ${t+1}</div><div class="s">${esc(testLabel(d,t))} · ${s.n?`${s.c}/${s.total} doğru`:`${s.total} soru`}</div></div><span>›</span></div>`; }
 
 // ---- Özetler / Testler listeleri ----
 V.summaries = () => {
   const ds = DOCS.filter(d=>d.summary);
-  return `${topbar('Özetler')}${ds.length?`<div class="list">${ds.map(d=>`<div class="item" data-act="openSummary" data-id="${d.id}"><div class="ic">📝</div><div class="grow"><div class="t">${esc(docTitle(d))}</div><div class="s">${esc(d.name)}</div></div>${META.favS.includes(d.id)?'⭐':''}<span>›</span></div>`).join('')}</div>`:emptyBox('📝','Henüz özet yok','Bir PDF yükle ve "Özet"i seç.')}`;
+  return `${topbar('Özetler')}${ds.length?`<div class="list">${ds.map(d=>`<div class="item" data-act="openSummary" data-id="${d.id}"><div class="ic">📝</div><div class="grow"><div class="t">${esc(docTitle(d))}</div><div class="s">${esc(d.name)}${allSums(d).length>1?` · ${allSums(d).length} özet`:''}</div></div>${META.favS.includes(d.id)?'⭐':''}<span>›</span></div>`).join('')}</div>`:emptyBox('📝','Henüz özet yok','Bir PDF yükle ve "Özet"i seç.')}`;
 };
 V.tests = () => {
   const ds = DOCS.filter(d=>(d.tests||[]).some(Boolean));
-  return `${topbar('Testler')}${ds.length?ds.map(d=>`<div style="font-weight:900;margin:10px 4px 6px">${esc(docTitle(d))}</div><div class="list">${d.tests.map((qs,t)=>qs?testItem(d,t):'').join('')}</div>`).join(''):emptyBox('🧪','Henüz test yok','Bir PDF yükle ve test sayısını seç.')}`;
+  return `${topbar('Testler')}${ds.length?ds.map(d=>`<div style="font-weight:900;margin:10px 4px 6px;cursor:pointer" data-act="goDoc" data-id="${d.id}">${esc(docTitle(d))} <span class="muted small">›</span></div><div class="list">${d.tests.map((qs,t)=>qs?testItem(d,t):'').join('')}</div>`).join(''):emptyBox('🧪','Henüz test yok','Bir PDF yükle ve test sayısını seç.')}`;
 };
 function emptyBox(ic,t,s){ return `<div class="empty"><div class="big">${ic}</div><b>${t}</b><div class="small">${s}</div><button class="btn" style="margin-top:14px" data-act="upload">📤 Dosya Yükle</button></div>`; }
 
 // ---- Özet görünümü ----
 const pgBtn = (id,p) => p ? `<button class="pg" data-act="openPage" data-id="${id}" data-p="${p}">s.${p}</button>` : '';
-V.summary = ({id}) => {
-  const d = docById(id); const s = d && d.summary; if(!s) return `${topbar('Özet')}<div class="empty">Özet yok</div>`;
+V.summary = (params) => {
+  const {id} = params; const d = docById(id); const list = allSums(d);
+  if(!list.length) return `${topbar('Özet')}<div class="empty">Özet yok</div>`;
+  const v = Math.max(0, Math.min(list.length-1, +params.v||0)); params.v = v;
+  const s = list[v].data;
   const fav = META.favS.includes(id);
+  const busy = !!GEN[id], dis = (busy||d.fileDeleted)?'disabled':'';
+  const tabs = list.length>1 ? `<div class="vtabs">${list.map((x,k)=>`<button class="${k===v?'on':''}" data-act="sumV" data-v="${k}">${esc(sumLabel(d,k))}</button>`).join('')}</div>` : '';
+  const more = `${genCard(d)}<div class="sec-t">Başka bir özet çıkar</div>
+  <div class="actgrid">
+    <button data-act="newSum" data-id="${id}" data-k="kisa" ${dis}><span>⚡</span>Kısa özet</button>
+    <button data-act="newSum" data-id="${id}" data-k="uzun" ${dis}><span>📖</span>Uzun özet</button>
+    <button data-act="newSum" data-id="${id}" data-k="yeni" ${dis}><span>🔄</span>Yeni özet</button>
+  </div>${v>0?`<button class="linkbtn small" style="display:block;margin:10px auto 0;color:var(--bad)" data-act="delSum" data-id="${id}" data-v="${v}">Bu özeti sil</button>`:''}`;
   const bol = (s.bolumler||[]).map(b=>`<h3>${esc(b.baslik)} ${pgBtn(id,b.sayfa)}</h3><p>${esc(b.ozet)}</p>${(b.maddeler||[]).length?`<ul>${b.maddeler.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}`).join('');
   const kav = (s.anahtar_kavramlar||[]).map(k=>`<div class="term"><b>${esc(k.kavram)}</b> — ${esc(k.tanim)} ${pgBtn(id,k.sayfa)}</div>`).join('');
   const ak = (s.akilda_kal||[]).map(x=>{ const b=typeof x==='string'?{bilgi:x}:x; return `<li>${esc(b.bilgi)} ${pgBtn(id,b.sayfa)}</li>`; }).join('');
   return `${topbar('Özet', `<button class="iconbtn star ${fav?'on':''}" data-act="favS" data-id="${id}" aria-label="Favori">${fav?'★':'☆'}</button><button class="iconbtn" data-act="shareSummary" data-id="${id}" aria-label="Paylaş">📤</button>`)}
+  ${tabs}
   <div class="card summary">
     <h2 style="margin:0 0 4px">${esc(s.baslik||d.name)}</h2>
-    <div class="muted small" style="margin-bottom:10px">${esc(d.name)}</div>
+    <div class="muted small" style="margin-bottom:10px">${esc(sumLabel(d,v))} · ${esc(d.name)}</div>
     <p>${esc(s.genel)}</p>${bol}
     ${kav?`<h3>Anahtar Kavramlar</h3>${kav}`:''}
     ${ak?`<h3>⭐ Akılda Kalsın</h3><ul>${ak}</ul>`:''}
-  </div>`;
+  </div>
+  ${more}`;
 };
 
 // ---- Test görünümü (tek tek sorular, kaldığı yer saklanır) ----
@@ -686,7 +898,7 @@ V.test = ({id,t}) => {
   const nav = qs.map((q,k)=>{ const st = a[k]===undefined?'':(a[k]===-1?'rev':(a[k]===q.dogru?'ok':'bad')); return `<button class="${st} ${k===i?'cur':''}" data-act="qgo" data-k="${k}">${k+1}</button>`; }).join('');
   const finished = sc.n===sc.total;
   return `${topbar(`Test ${+t+1} · ${docTitle(d)}`, `<button class="iconbtn" data-act="shareTest" data-id="${id}" data-t="${t}" aria-label="Testi paylaş">📤</button>`)}
-  <div class="row between" style="margin-bottom:6px"><span class="muted small">${esc(TEST_FOCUS[t]||'')}</span><b>${sc.c} doğru · ${sc.w} yanlış${sc.r?` · ${sc.r} bakıldı`:''}</b></div>
+  <div class="row between" style="margin-bottom:6px"><span class="muted small">${esc(testLabel(d,t))}</span><b>${sc.c} doğru · ${sc.w} yanlış${sc.r?` · ${sc.r} bakıldı`:''}</b></div>
   <div class="qnav">${nav}</div>
   ${finished?`<div class="card" style="text-align:center"><div class="muted small">Test bitti</div><div class="score-big">%${Math.round(sc.c/sc.total*100)}</div><div class="row" style="justify-content:center"><button class="btn ghost" data-act="resetTest" data-id="${id}" data-t="${t}">↺ Yeniden çöz</button></div></div>`:''}
   ${questionCard(d, t, i, a[i], 'test')}`;
@@ -747,24 +959,90 @@ V.page = ({id,p,quote}) => {
   const d = docById(id);
   return `${topbar(`Sayfa ${p}${d?` / ${d.pages}`:''}`)}
   ${quote?`<div class="info-box vquote small"><b>Alıntı:</b> “${esc(quote)}”</div>`:''}
-  <div class="viewer" id="viewer"><div class="empty">Sayfa yükleniyor…</div></div>
+  <div class="zoombar"><button data-act="zoom" data-z="-1" aria-label="Küçült">−</button><span id="zlbl">%${Math.round(ZOOM*100)}</span><button data-act="zoom" data-z="1" aria-label="Büyüt">+</button><button data-act="zoom" data-z="0" aria-label="Sığdır">⤢</button></div>
+  <div class="viewer" id="viewer"><div id="zin" style="width:${ZOOM*100}%"><div class="empty">Sayfa yükleniyor…</div></div></div>
+  <div class="muted small" style="text-align:center;margin-top:6px">İki parmakla büyüt/küçült · çift dokun: yakınlaştır</div>
   <div class="qfoot"><button class="btn ghost" data-act="pageStep" data-d="-1" ${p<=1?'disabled':''}>← Önceki</button><button class="btn ghost" data-act="pageStep" data-d="1" ${d&&p>=d.pages?'disabled':''}>Sonraki →</button></div>
   <div class="row" style="justify-content:center;margin-top:10px"><button class="btn" data-act="back">↩ Kaldığım yere dön</button></div>`;
 };
 const pdfCache = new Map();
+// ---- Yakınlaştırma (iki parmak, çift dokunma, + / − düğmeleri) ----
+let ZOOM = 1, PINCH = false, sharpT = null;
+const ZMIN = 1, ZMAX = 5;
+const wantScale = () => Math.min(5, Math.max(2, Math.ceil(ZOOM*2)));
+function setZoom(z, cx, cy){
+  const box = $('#viewer'), zin = $('#zin'); if(!box || !zin) return;
+  z = Math.max(ZMIN, Math.min(ZMAX, z)); const z0 = ZOOM; if(Math.abs(z-z0) < 0.001) return;
+  const r = box.getBoundingClientRect();
+  if(cx == null){ cx = r.left + r.width/2; cy = Math.max(r.top,0)/2 + Math.min(r.bottom, window.innerHeight)/2; }
+  const fx = cx - r.left, fy = cy - r.top;
+  const contentX = box.scrollLeft + fx;
+  ZOOM = z; zin.style.width = (z*100)+'%';
+  box.scrollLeft = contentX*z/z0 - fx;
+  window.scrollBy(0, fy*z/z0 - fy);
+  const l = $('#zlbl'); if(l) l.textContent = '%'+Math.round(z*100);
+  scheduleSharp();
+}
+function scheduleSharp(){ clearTimeout(sharpT); sharpT = setTimeout(sharpen, 350); }
+async function sharpen(){
+  if(PINCH){ scheduleSharp(); return; }
+  const c = cur(); if(!c || c.view!=='page') return;
+  const zin = $('#zin'); const old = zin && zin.querySelector('canvas'); if(!old) return;
+  const want = wantScale(); if(+old.dataset.scale === want) return;
+  const pdf = pdfCache.get(c.params.id); if(!pdf) return;
+  try{
+    const cv = await renderPage(pdf, c.params.p, want); cv.dataset.scale = want;
+    if(cur()!==c || !old.isConnected) return;
+    old.replaceWith(cv); old.width = 0; old.height = 0;
+  }catch(e){}
+}
+function attachZoom(){
+  const box = $('#viewer'); if(!box) return;
+  const dist = (a,b) => Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+  let pinch = null, tap = null, lastTap = null;
+  box.addEventListener('touchstart', e => {
+    if(e.touches.length === 2){ const [a,b] = e.touches; pinch = { d: dist(a,b) || 1, z: ZOOM }; PINCH = true; tap = null; if(e.cancelable) e.preventDefault(); }
+    else if(e.touches.length === 1){ const t = e.touches[0]; tap = { x:t.clientX, y:t.clientY, time:Date.now() }; }
+  }, {passive:false});
+  box.addEventListener('touchmove', e => {
+    if(pinch && e.touches.length === 2){
+      if(e.cancelable) e.preventDefault();
+      const [a,b] = e.touches;
+      setZoom(pinch.z * dist(a,b) / pinch.d, (a.clientX+b.clientX)/2, (a.clientY+b.clientY)/2);
+    } else if(tap && e.touches.length === 1){ const t = e.touches[0]; if(Math.abs(t.clientX-tap.x) > 10 || Math.abs(t.clientY-tap.y) > 10) tap = null; }
+  }, {passive:false});
+  box.addEventListener('touchend', e => {
+    if(pinch){ if(e.touches.length < 2){ pinch = null; PINCH = false; scheduleSharp(); } return; }
+    if(!tap || e.touches.length) return;
+    const now = Date.now(), t = e.changedTouches[0];
+    if(now - tap.time < 300){
+      if(lastTap && now - lastTap.time < 320 && Math.abs(t.clientX-lastTap.x) < 40 && Math.abs(t.clientY-lastTap.y) < 40){
+        if(e.cancelable) e.preventDefault();
+        setZoom(ZOOM > 1.2 ? 1 : 2.5, t.clientX, t.clientY); lastTap = null;
+      } else lastTap = { x:t.clientX, y:t.clientY, time:now };
+    }
+    tap = null;
+  }, {passive:false});
+  box.addEventListener('touchcancel', () => { pinch = null; PINCH = false; tap = null; });
+  // iPhone (WKWebView) kendi sayfa yakınlaştırmasını yapmasın
+  ['gesturestart','gesturechange','gestureend'].forEach(n => box.addEventListener(n, e => e.preventDefault()));
+}
 async function drawPage(){
   const c = cur(); if(!c || c.view!=='page') return;
-  const {id,p} = c.params; const box = $('#viewer'); if(!box) return;
+  const {id,p} = c.params; const box = $('#zin'); if(!box) return;
+  attachZoom();
   try{
+    const d = docById(id);
     const f = await DB.get('files', id);
-    if(!f) throw new Error('Dosya bu cihazda bulunamadı.');
-    if(f.kind==='images'){ const b=f.images[p-1]; if(!b) throw new Error('Sayfa yok'); const u=URL.createObjectURL(b); box.innerHTML=`<img src="${u}" alt="Sayfa ${p}">`; return; }
+    if(!f) throw new Error(d && d.fileDeleted ? 'Bu belgenin PDF dosyası silindi.' : 'Dosya bu cihazda bulunamadı.');
+    if(f.kind==='images'){ const b=f.images[p-1]; if(!b) throw new Error('Sayfa yok'); const u=URL.createObjectURL(b); box.innerHTML=`<img src="${u}" alt="Sayfa ${p}" draggable="false">`; return; }
     let pdf = pdfCache.get(id);
     if(!pdf){ pdf = await pdfLib().getDocument({data: await f.blob.arrayBuffer(), isEvalSupported:false}).promise; pdfCache.set(id,pdf); }
-    const canvas = await renderPage(pdf, p, 2);
+    const sc = wantScale();
+    const canvas = await renderPage(pdf, p, sc); canvas.dataset.scale = sc;
     if(cur()!==c) return;
     box.innerHTML=''; box.appendChild(canvas);
-  }catch(e){ box.innerHTML = `<div class="err-box">${esc(e.message||'Sayfa gösterilemedi')}</div>`; }
+  }catch(e){ box.innerHTML = `<div class="err-box" style="margin:10px">${esc(e.message||'Sayfa gösterilemedi')}</div>`; }
 }
 
 // ---- Profil ----
@@ -872,7 +1150,7 @@ async function testPdf(d,t){
   function need(h){ if(y+h > H-110) newPage(); }
   newPage();
   x.fillStyle='#1f2430'; x.font=`900 46px ${FONT}`; x.fillText(`${docTitle(d)}`.slice(0,45), M, y); y+=50;
-  x.fillStyle='#6b7080'; x.font=`600 26px ${FONT}`; x.fillText(`Test ${t+1} · ${qs.length} soru · ${TEST_FOCUS[t]||''}`, M, y); y+=30;
+  x.fillStyle='#6b7080'; x.font=`600 26px ${FONT}`; x.fillText(`Test ${t+1} · ${qs.length} soru · ${testLabel(d,t)}`.slice(0,80), M, y); y+=30;
   x.fillText('Ad Soyad: ____________________________     Puan: ______', M, y+40); y+=100;
   qs.forEach((q,i)=>{
     x.font=`800 30px ${FONT}`; const ql = wrapLines(x, `${i+1}. ${q.soru}`, CW);
@@ -978,12 +1256,32 @@ const ACT = {
   jobCancel: () => { const j=JOB.active; if(j){ j.ctrl.abort(); j.closed=true; } JOB.active=null; back(); },
   jobClose: () => { if(JOB.active) JOB.active.closed=true; JOB.active=null; back(); },
   openDoc: el => { if(JOB.active){ JOB.active.closed=true; JOB.active=null; } go('doc',{id:el.dataset.id},true); },
-  delDoc: el => openModal(`<b>Bu belge silinsin mi?</b><p class="muted small">Özeti, testleri ve favorilerdeki soruları da silinir. Geri alınamaz.</p><div class="row"><button class="btn" style="background:var(--bad)" data-act="delDocYes" data-id="${el.dataset.id}">Sil</button><button class="btn ghost" data-act="closeModal">Vazgeç</button></div>`),
-  delDocYes: async el => { const id=el.dataset.id; closeModal(); await DB.del('docs',id); await DB.del('files',id); DOCS=DOCS.filter(d=>d.id!==id); META.favQ=META.favQ.filter(k=>!k.startsWith(id+'|')); META.favS=META.favS.filter(x=>x!==id); await saveMeta(); MIX=null; back(); toast('Silindi'); },
-  openSummary: el => go('summary',{id:el.dataset.id}),
+  delDoc: (el, e) => { if(e) e.stopPropagation(); const d=docById(el.dataset.id); if(!d) return; openModal(`<b>Ne silinsin?</b><p class="muted small" style="word-break:break-word">${esc(d.name)}</p>
+    ${d.fileDeleted?'':`<button class="btn ghost block" style="margin-bottom:8px;flex-direction:column;gap:0" data-act="delFileYes" data-id="${d.id}">📄 Sadece PDF dosyasını sil<span class="small muted" style="font-weight:600">Özet ve testler kalır, telefonda yer açılır</span></button>`}
+    <button class="btn block" style="background:var(--bad);margin-bottom:8px;flex-direction:column;gap:0" data-act="delDocYes" data-id="${d.id}">🗑️ Belgeyi tamamen sil<span class="small" style="font-weight:600;opacity:.85">PDF, özetler, testler ve favoriler silinir</span></button>
+    <button class="btn ghost block" data-act="closeModal">Vazgeç</button>`); },
+  delFileYes: async el => { const id=el.dataset.id; const d=docById(id); closeModal(); if(!d) return; if(GEN[id]) GEN[id].ctrl.abort(); await DB.del('files',id); d.fileDeleted=true; await saveDoc(d); pdfCache.delete(id); SRC_CACHE.delete(id); const y=window.scrollY; render(); window.scrollTo(0,y); toast('PDF dosyası silindi'); },
+  delDocYes: async el => { const id=el.dataset.id; closeModal(); if(GEN[id]) GEN[id].ctrl.abort(); await DB.del('docs',id); await DB.del('files',id); DOCS=DOCS.filter(d=>d.id!==id); pdfCache.delete(id); SRC_CACHE.delete(id); META.favQ=META.favQ.filter(k=>!k.startsWith(id+'|')); META.favS=META.favS.filter(x=>x!==id); await saveMeta(); MIX=null; if(cur() && cur().params && cur().params.id===id) back(); else render(); toast('Silindi'); },
+  docs: () => go('docs'),
+  goDoc: el => go('doc',{id:el.dataset.id}),
+  setSumKind: el => { opts.sumKind = el.dataset.k; render(); },
+  newSum: el => { const d=docById(el.dataset.id); if(d) makeSummary(d, el.dataset.k); },
+  newTest: el => { const d=docById(el.dataset.id); if(d) makeTest(d, +el.dataset.n, null); },
+  genCancel: el => { const g=GEN[el.dataset.id]; if(g){ g.ctrl.abort(); delete GEN[el.dataset.id]; softRender(); toast('İptal edildi'); } },
+  openTopics: el => { const d=docById(el.dataset.id); if(d) d._topicTried=false; go('topics',{id:el.dataset.id}); },
+  reloadTopics: el => { const d=docById(el.dataset.id); if(!d) return; d.topics=null; TOPSEL.set.clear(); loadTopics(d); },
+  topicToggle: el => { const i=+el.dataset.i; TOPSEL.set.has(i)?TOPSEL.set.delete(i):TOPSEL.set.add(i); softRender(); },
+  topicAll: () => { const d=docById(TOPSEL.id); const n=topicsOf(d).length; if(TOPSEL.set.size===n) TOPSEL.set.clear(); else for(let i=0;i<n;i++) TOPSEL.set.add(i); softRender(); },
+  topicN: el => { TOPSEL.n=+el.dataset.n; softRender(); },
+  topicCreate: el => { const d=docById(el.dataset.id); if(!d) return; const list=topicsOf(d); const topics=[...TOPSEL.set].sort((a,b)=>a-b).map(i=>list[i] && list[i].baslik).filter(Boolean); if(!topics.length) return; makeTest(d, TOPSEL.n, topics); TOPSEL.set.clear(); const below=STACK[STACK.length-2]; if(below && below.view==='doc' && below.params.id===d.id) back(); else go('doc',{id:d.id},true); },
+  sumV: el => { cur().params.v=+el.dataset.v; render(); window.scrollTo(0,0); },
+  delSum: el => openModal(`<b>Bu özet silinsin mi?</b><div class="row" style="margin-top:10px"><button class="btn" style="background:var(--bad)" data-act="delSumYes" data-id="${el.dataset.id}" data-v="${el.dataset.v}">Sil</button><button class="btn ghost" data-act="closeModal">Vazgeç</button></div>`),
+  delSumYes: async el => { const d=docById(el.dataset.id); const v=+el.dataset.v; closeModal(); if(!d || v<1 || !d.sums) return; d.sums.splice(v-1,1); await saveDoc(d); cur().params.v=0; render(); toast('Özet silindi'); },
+  zoom: el => { const z=+el.dataset.z; if(z===0) setZoom(1); else setZoom(z>0 ? ZOOM*1.25 : ZOOM/1.25); },
+  openSummary: el => go('summary',{id:el.dataset.id, v:+el.dataset.v||0}),
   openTest: el => go('test',{id:el.dataset.id,t:+el.dataset.t}),
   openSingle: el => go('single',{id:el.dataset.id,t:+el.dataset.t,i:+el.dataset.i,title:'Favori Soru'}),
-  openPage: el => go('page',{id:el.dataset.id,p:+el.dataset.p||1,quote:el.dataset.quote||''}),
+  openPage: el => { ZOOM=1; go('page',{id:el.dataset.id,p:+el.dataset.p||1,quote:el.dataset.quote||''}); },
   pageStep: el => { const c=cur(); const d=docById(c.params.id); const p=Math.max(1,Math.min(d?d.pages:1,c.params.p+(+el.dataset.d))); c.params={...c.params,p,quote:''}; render(); window.scrollTo(0,0); },
   qgo: el => { const c=cur(); const d=docById(c.params.id); const k=+el.dataset.k; if(k<0||k>=d.tests[c.params.t].length) return; d.progress[c.params.t]=k; saveDoc(d); render(); window.scrollTo(0,0); },
   answer: async el => {
@@ -1000,7 +1298,7 @@ const ACT = {
   favTab: el => { favTab=el.dataset.v; render(); },
   shareQ: async el => { const d=docById(el.dataset.id); const q=d.tests[+el.dataset.t][+el.dataset.i]; toast('Görsel hazırlanıyor…'); const img = await questionImage(q,d); doShare({image:img, text: shareText('🤔 Bu soruyu çözebilir misin?'), title:'Soru'}); },
   shareTest: async el => { const d=docById(el.dataset.id); const t=+el.dataset.t; toast('PDF hazırlanıyor…'); try{ const blob = await testPdf(d,t); const name = `${safeName(docTitle(d))}-Test-${t+1}.pdf`; doShare({file:{blob, mime:'application/pdf', name}, text: shareText(`📝 ${docTitle(d)} — Test ${t+1}`), title:`Test ${t+1}`}); }catch(e){ doShare({text: shareText(testShareText(d,t)), title:`Test ${t+1}`}); } },
-  shareSummary: el => { const d=docById(el.dataset.id); const s=d.summary; const ak=(s.akilda_kal||[]).map(x=>'• '+(typeof x==='string'?x:x.bilgi)).join('\n'); doShare({text: shareText(`📝 ${s.baslik||d.name}\n\n${s.genel||''}${ak?`\n\n⭐ Akılda kalsın:\n${ak}`:''}`), title:'Özet'}); },
+  shareSummary: el => { const d=docById(el.dataset.id); const c=cur(); const s=(allSums(d)[(c&&c.params.v)||0]||{data:d.summary}).data; const ak=(s.akilda_kal||[]).map(x=>'• '+(typeof x==='string'?x:x.bilgi)).join('\n'); doShare({text: shareText(`📝 ${s.baslik||d.name}\n\n${s.genel||''}${ak?`\n\n⭐ Akılda kalsın:\n${ak}`:''}`), title:'Özet'}); },
   copyShare: async () => { const ta=$('#modalRoot textarea'); try{ await navigator.clipboard.writeText(ta.value); toast('Kopyalandı'); }catch(e){ ta.select(); toast('Metni seçip kopyala'); } },
 };
 document.addEventListener('click', e => {
