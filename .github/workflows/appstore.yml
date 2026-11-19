@@ -82,8 +82,18 @@ jobs:
           else
             PROFILES="<key>signingStyle</key><string>automatic</string>"
           fi
-          xcodebuild -project YukleDetayla.xcodeproj -scheme YukleDetayla -configuration Release \
-            -destination 'generic/platform=iOS' -archivePath $RUNNER_TEMP/yd.xcarchive $AUTH archive | tail -n 60
+          if [ "${{ steps.imza.outcome }}" = "success" ]; then
+            xcodebuild -project YukleDetayla.xcodeproj -scheme YukleDetayla -configuration Release \
+              -destination 'generic/platform=iOS' -archivePath $RUNNER_TEMP/yd.xcarchive archive | tail -n 60
+          else
+            # Bulut imzası: arşiv geçici (ad hoc) imzayla, yetkiler (Apple ile giriş vb.) korunarak alınır;
+            # gerçek dağıtım imzasını dışa aktarma sırasında Apple'ın bulut sertifikası atar.
+            xcodebuild -project YukleDetayla.xcodeproj -scheme YukleDetayla -configuration Release \
+              -destination 'generic/platform=iOS' -archivePath $RUNNER_TEMP/yd.xcarchive \
+              CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO PROVISIONING_PROFILE_SPECIFIER= \
+              archive | tail -n 60
+            codesign -d --entitlements - $RUNNER_TEMP/yd.xcarchive/Products/Applications/*.app 2>&1 | tail -n 20 || true
+          fi
           cat > $RUNNER_TEMP/export.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
