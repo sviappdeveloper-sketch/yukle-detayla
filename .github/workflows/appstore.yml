@@ -41,8 +41,15 @@ jobs:
           brew install xcodegen
           pip3 install --quiet --break-system-packages pyjwt cryptography || pip3 install --quiet pyjwt cryptography
       - name: Sertifika, profil, paket kimliği
+        id: imza
+        continue-on-error: true
         run: python3 tool/ios_signing.py
+      - name: API anahtarı dosyası
+        run: |
+          mkdir -p ~/private_keys
+          printf '%s\n' "$ASC_KEY_P8" > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
       - name: Anahtar zinciri ve profil
+        if: steps.imza.outcome == 'success'
         run: |
           KC=$RUNNER_TEMP/imza.keychain-db
           security create-keychain -p gecici "$KC"
@@ -59,33 +66,39 @@ jobs:
           N=$(date -u +%Y%m%d%H%M)
           echo "Derleme numarası: $N"
           sed -i '' "s/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = $N/" ios/Config.xcconfig
+          if [ "${{ steps.imza.outcome }}" = "success" ]; then
           perl -0pi -e 's/        CODE_SIGN_STYLE: Automatic/        CODE_SIGN_STYLE: Manual\n        CODE_SIGN_IDENTITY: Apple Distribution\n        PROVISIONING_PROFILE_SPECIFIER: "$ENV{PROFILE_NAME}"/' ios/project.yml
+          else echo "Apple yeni sertifika vermedi: Apple'ın bulut imzası (otomatik imza) kullanılacak"; fi
           grep -n "CODE_SIGN\|PROVISIONING" ios/project.yml
           cd ios && xcodegen generate
       - name: Arşiv ve IPA
         working-directory: ios
         run: |
           set -o pipefail
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $HOME/private_keys/AuthKey_$ASC_KEY_ID.p8 -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID"
+          if [ "${{ steps.imza.outcome }}" = "success" ]; then
+            AUTH=""
+            PROFILES="<key>signingStyle</key><string>manual</string><key>provisioningProfiles</key><dict><key>com.mobihome.yukledetayla</key><string>$PROFILE_NAME</string></dict>"
+          else
+            PROFILES="<key>signingStyle</key><string>automatic</string>"
+          fi
           xcodebuild -project YukleDetayla.xcodeproj -scheme YukleDetayla -configuration Release \
-            -destination 'generic/platform=iOS' -archivePath $RUNNER_TEMP/yd.xcarchive archive | tail -n 60
+            -destination 'generic/platform=iOS' -archivePath $RUNNER_TEMP/yd.xcarchive $AUTH archive | tail -n 60
           cat > $RUNNER_TEMP/export.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict>
             <key>method</key><string>app-store-connect</string>
             <key>teamID</key><string>$APPLE_TEAM_ID</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>provisioningProfiles</key><dict><key>com.mobihome.yukledetayla</key><string>$PROFILE_NAME</string></dict>
+            $PROFILES
             <key>uploadSymbols</key><true/>
           </dict></plist>
           EOF
           xcodebuild -exportArchive -archivePath $RUNNER_TEMP/yd.xcarchive -exportPath $RUNNER_TEMP/ipa \
-            -exportOptionsPlist $RUNNER_TEMP/export.plist | tail -n 30
+            -exportOptionsPlist $RUNNER_TEMP/export.plist $AUTH | tail -n 30
           ls -la $RUNNER_TEMP/ipa
       - name: App Store Connect'e yükle
         run: |
-          mkdir -p ~/private_keys
-          printf '%s\n' "$ASC_KEY_P8" > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
           xcrun altool --upload-app -f $RUNNER_TEMP/ipa/*.ipa -t ios --apiKey $ASC_KEY_ID --apiIssuer $ASC_ISSUER_ID
       - name: Mağaza sayfası, derlemeyi bağla${{ inputs.gonder && ', incelemeye gönder' || '' }}
         env:
