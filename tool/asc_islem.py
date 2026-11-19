@@ -129,6 +129,26 @@ INFO_ID = adim("Uygulama bilgileri", uygulama_bilgileri)
 cfg = open(os.path.join(ROOT, "ios", "Config.xcconfig"), encoding="utf-8").read()
 VER = re.search(r"^MARKETING_VERSION\s*=\s*(\S+)", cfg, re.M).group(1)
 DUZENLENEBILIR = "PREPARE_FOR_SUBMISSION,DEVELOPER_REJECTED,REJECTED,METADATA_REJECTED,INVALID_BINARY"
+tum = call("GET", f"/apps/{APP_ID}/appStoreVersions?filter[platform]=IOS&limit=10")["data"]
+print("Mevcut sürümler:", ", ".join(f"{v['attributes']['versionString']} ({v['attributes']['appStoreState']})" for v in tum) or "yok")
+BEKLEYEN = ("WAITING_FOR_REVIEW", "IN_REVIEW", "UNRESOLVED_ISSUES", "READY_FOR_REVIEW")
+bekleyen = [v for v in tum if v["attributes"]["appStoreState"] in BEKLEYEN]
+if bekleyen and os.environ.get("ESKIYI_GERI_CEK", "evet") == "evet":
+    # Eski sürüm hâlâ Apple sırasında: incelemeden geri çekilir, yeni derlemeyle (VER) yeniden gönderilir
+    v = bekleyen[0]
+    print(f"{v['attributes']['versionString']} incelemede bekliyor; yeni sürüm için incelemeden geri çekiliyor")
+    subs = call("GET", f"/reviewSubmissions?filter[app]={APP_ID}&filter[platform]=IOS&limit=20")["data"]
+    for sb in subs:
+        if sb["attributes"].get("state") in ("WAITING_FOR_REVIEW", "IN_REVIEW", "UNRESOLVED_ISSUES", "READY_FOR_REVIEW"):
+            call("PATCH", f"/reviewSubmissions/{sb['id']}", {"data": {"type": "reviewSubmissions", "id": sb["id"],
+                 "attributes": {"canceled": True}}})
+            print("   inceleme gönderimi iptal edildi:", sb["id"])
+    for _ in range(30):
+        st = call("GET", f"/appStoreVersions/{v['id']}")["data"]["attributes"]["appStoreState"]
+        print("   durum:", st)
+        if st in DUZENLENEBILIR.split(","):
+            break
+        time.sleep(20)
 surumler = call("GET", f"/apps/{APP_ID}/appStoreVersions?filter[platform]=IOS&filter[appStoreState]={DUZENLENEBILIR}&limit=5")["data"]
 if surumler:
     surum = surumler[0]
