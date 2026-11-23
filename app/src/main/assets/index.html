@@ -259,13 +259,29 @@ const docById = id => DOCS.find(d => d.id===id);
 
 // ================= Yapay zekâ =================
 function blobToB64(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(b); }); }
+// Firebase giriş anahtarı (ID token): sunucu yalnızca giriş yapmış üyelere hizmet verir.
+const _tokWait = {};
+window.__ydTok = (id, tok) => { const f=_tokWait[id]; if(f){ delete _tokWait[id]; f(tok||''); } };
+function idToken(){
+  const A = window.Android;
+  if(!A || typeof A.getIdToken !== 'function') return Promise.resolve('');
+  return new Promise(res => {
+    const id = 't'+Date.now()+Math.random().toString(36).slice(2,8);
+    _tokWait[id] = res;
+    setTimeout(()=>window.__ydTok(id,''), 8000);
+    try{ A.getIdToken(id); }catch(e){ window.__ydTok(id,''); }
+  });
+}
 function makeRemoteSample(cfg){
   const f = async (prompt, opts={}) => {
     const images = [];
     for(const b of (opts.images||[])) images.push(await blobToB64(b));
     let r;
     try{
-      r = await fetch(cfg.apiUrl, {method:'POST', headers:{'content-type':'application/json','x-app-key':cfg.appKey||''}, body: JSON.stringify({prompt, images}), signal: opts.signal});
+      const headers = {'content-type':'application/json','x-app-key':cfg.appKey||''};
+      const tok = await idToken();
+      if(tok) headers.authorization = 'Bearer '+tok;
+      r = await fetch(cfg.apiUrl, {method:'POST', headers, body: JSON.stringify({prompt, images}), signal: opts.signal});
     }catch(e){ if(opts.signal && opts.signal.aborted) throw e; throw new Error('İnternet bağlantısı yok gibi görünüyor.'); }
     if(r.status===429) throw {code:'rate_limited', message:'Kullanım sınırı'};
     let j = {}; try{ j = await r.json(); }catch(e){}

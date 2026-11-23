@@ -467,6 +467,17 @@ public class MainActivity extends Activity {
             FirebaseAuth a = auth();
             return a == null ? "" : userJson(a.getCurrentUser(), null);
         }
+        // Yapay zekâ sunucusu için Firebase giriş anahtarı (ID token); sonuç window.__ydTok(id, token) ile döner.
+        @JavascriptInterface public void getIdToken(String id) {
+            final String cb = org.json.JSONObject.quote(id == null ? "" : id);
+            FirebaseAuth a = auth();
+            com.google.firebase.auth.FirebaseUser u = a == null ? null : a.getCurrentUser();
+            if (u == null) { js("window.__ydTok&&window.__ydTok(" + cb + ",'')"); return; }
+            u.getIdToken(false).addOnCompleteListener(t -> {
+                String tok = t.isSuccessful() && t.getResult() != null && t.getResult().getToken() != null ? t.getResult().getToken() : "";
+                js("window.__ydTok&&window.__ydTok(" + cb + "," + org.json.JSONObject.quote(tok) + ")");
+            });
+        }
         @JavascriptInterface public void showInterstitial() { MainActivity.this.showInterstitial(); }
         @JavascriptInterface public void deleteAccount() { runOnUiThread(MainActivity.this::deleteAccount); }
         @JavascriptInterface public void emailAuth(String kind, String email, String pass) {

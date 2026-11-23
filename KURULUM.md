@@ -27,6 +27,11 @@ Uygulama 3 parçadan oluşur ve **tamamen ücretsizdir**:
 5. Worker sayfasında **Settings → Variables and Secrets → Add**:
    - `GEMINI_API_KEY` → Tür: **Secret** → 1. adımdaki `AIza...` anahtarın
 6. Worker'ın adresini kopyala (ör. `https://yukle-detayla.KULLANICIADIN.workers.dev`).
+7. **Güvenlik:** Sunucu, uygulamaya giriş yapmış üyeleri Firebase giriş anahtarıyla tanır ve her üyeye
+   günlük sınır uygular (varsayılan 150 istek, `DAILY_LIMIT` ile değişir). Giriş anahtarı göndermeyen
+   eski sürümler geçiş döneminde IP başına günde 60 istekle çalışmaya devam eder. Yeni sürüm mağazalarda
+   yayınlanıp herkes güncelleyince `REQUIRE_TOKEN` → Tür: **Text** → `true` ekleyin; o andan sonra
+   yalnızca giriş yapmış üyeler kullanabilir.
 
 ## 3. Uygulamaya sunucu adresini yaz
 

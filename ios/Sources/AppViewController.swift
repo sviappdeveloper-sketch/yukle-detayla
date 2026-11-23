@@ -79,6 +79,7 @@ final class AppViewController: UIViewController {
         deleteAccount: function(){ post({a:'deleteAccount'}); },
         emailAuth: function(k, e, p){ post({a:'emailAuth', k:String(k), e:String(e), p:String(p||'')}); },
         showInterstitial: function(){ post({a:'ad'}); },
+        getIdToken: function(i){ post({a:'idToken', i:String(i)}); },
         shareImage: function(b, t){ post({a:'shareImage', b:String(b), t:String(t||'')}); },
         shareText: function(t){ post({a:'shareText', t:String(t||'')}); },
         shareFile: function(b, m, n, t){ post({a:'shareFile', b:String(b), m:String(m||''), n:String(n||''), t:String(t||'')}); }
@@ -112,6 +113,13 @@ final class AppViewController: UIViewController {
       emailAuth(kind: body["k"] as? String ?? "in", email: body["e"] as? String ?? "", pass: body["p"] as? String ?? "")
     case "ad":
       showInterstitial()
+    case "idToken":
+      // Yapay zekâ sunucusu için Firebase giriş anahtarı (ID token)
+      let cb = Self.jsString(body["i"] as? String ?? "")
+      guard let u = Auth.auth().currentUser else { js("window.__ydTok&&window.__ydTok(\(cb),'')"); return }
+      u.getIDToken { [weak self] tok, _ in
+        self?.js("window.__ydTok&&window.__ydTok(\(cb),\(Self.jsString(tok ?? "")))")
+      }
     case "shareImage":
       let data = Data(base64Encoded: body["b"] as? String ?? "", options: .ignoreUnknownCharacters)
       var items: [Any] = []
