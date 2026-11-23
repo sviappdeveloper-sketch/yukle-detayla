@@ -19,8 +19,9 @@ jobs:
         run: |
           chmod +x ./gradlew
           export BUILD_NUMBER=$((1000 + BUILD_NUMBER))
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug bundleRelease
           mkdir -p out && cp app/build/outputs/apk/debug/*.apk out/YukleDetayla.apk
+          mkdir -p aab && cp app/build/outputs/bundle/release/*.aab aab/YukleDetayla.aab
       - uses: actions/upload-artifact@v4
         with:
           name: YukleDetayla-apk
@@ -33,3 +34,10 @@ jobs:
           git config user.name "github-actions"; git config user.email "actions@github.com"
           git add YukleDetayla.apk && git commit -q -m "APK #${{ github.run_number }}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" apk-build
+      - name: Play Store paketini (AAB) aab dalına koy
+        run: |
+          cd aab
+          git init -q -b aab
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          git add YukleDetayla.aab && git commit -q -m "AAB #${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" aab
