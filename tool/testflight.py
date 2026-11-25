@@ -51,18 +51,65 @@ if builds and not grp["attributes"].get("hasAccessToAllBuilds", True):
     except urllib.error.HTTPError:
         pass
 
-if EMAIL:
-    testers = call("GET", f"/betaTesters?filter[email]={EMAIL}&filter[apps]={APP_ID}")["data"]
-    if testers:
+def dis_grup():
+    """Apple hesabı App Store Connect kullanıcısı olmayan test kullanıcıları için dış test grubu."""
+    gs = call("GET", f"/apps/{APP_ID}/betaGroups?limit=50")["data"]
+    g = next((x for x in gs if not x["attributes"].get("isInternalGroup")), None)
+    if not g:
+        g = call("POST", "/betaGroups", {"data": {"type": "betaGroups",
+            "attributes": {"name": "Aile ve arkadaşlar"},
+            "relationships": {"app": {"data": {"type": "apps", "id": APP_ID}}}}})["data"]
+        print("Dış test grubu açıldı: Aile ve arkadaşlar")
+    # bilgi ve inceleme bilgisi (dış test Apple'ın kısa beta incelemesinden geçer)
+    try:
+        bi = call("GET", f"/apps/{APP_ID}/betaAppLocalizations")["data"]
+        if not bi:
+            call("POST", "/betaAppLocalizations", {"data": {"type": "betaAppLocalizations",
+                 "attributes": {"locale": "tr", "feedbackEmail": "sviapp.developer@gmail.com",
+                                "description": "PDF'ini yükle; özetini oku, testlerle çalış."},
+                 "relationships": {"app": {"data": {"type": "apps", "id": APP_ID}}}}}, quiet=True)
+    except urllib.error.HTTPError:
+        pass
+    try:
+        rd = call("GET", f"/apps/{APP_ID}/betaAppReviewDetail")["data"]
+        r = ns["META"]["review"]
+        call("PATCH", f"/betaAppReviewDetails/{rd['id']}", {"data": {"type": "betaAppReviewDetails", "id": rd["id"],
+             "attributes": {"contactFirstName": r["contactFirstName"], "contactLastName": r["contactLastName"],
+                            "contactEmail": r["contactEmail"], "contactPhone": r["contactPhone"],
+                            "demoAccountRequired": True, "demoAccountName": r["demoAccountName"],
+                            "demoAccountPassword": r["demoAccountPassword"], "notes": r["notes"]}}}, quiet=True)
+    except urllib.error.HTTPError as e:
+        print("   beta inceleme bilgisi yazılamadı:", getattr(e, "body", "")[:200])
+    if builds:
+        bid = builds[0]["id"]
         try:
-            call("POST", f"/betaGroups/{grp['id']}/relationships/betaTesters",
-                 {"data": [{"type": "betaTesters", "id": testers[0]["id"]}]}, quiet=True)
+            call("POST", f"/betaGroups/{g['id']}/relationships/builds", {"data": [{"type": "builds", "id": bid}]}, quiet=True)
         except urllib.error.HTTPError:
             pass
+        try:
+            call("POST", "/betaAppReviewSubmissions", {"data": {"type": "betaAppReviewSubmissions",
+                 "relationships": {"build": {"data": {"type": "builds", "id": bid}}}}}, quiet=True)
+            print("Son derleme dış test için Apple beta incelemesine gönderildi.")
+        except urllib.error.HTTPError as e:
+            print("   beta incelemesi:", getattr(e, "body", "")[:300])
+    return g
+
+
+for EMAIL in [e.strip() for e in EMAIL.split(",") if e.strip()]:
+    testers = call("GET", f"/betaTesters?filter[email]={EMAIL}&filter[apps]={APP_ID}")["data"]
+    if testers:
         print("Test kullanıcısı zaten var:", EMAIL)
-    else:
+        continue
+    try:
         call("POST", "/betaTesters", {"data": {"type": "betaTesters",
-             "attributes": {"email": EMAIL, "firstName": "Seyfullah", "lastName": "Sivi"},
-             "relationships": {"betaGroups": {"data": [{"type": "betaGroups", "id": grp["id"]}]}}}})
-        print("Davet gönderildi:", EMAIL)
+             "attributes": {"email": EMAIL},
+             "relationships": {"betaGroups": {"data": [{"type": "betaGroups", "id": grp["id"]}]}}}}, quiet=True)
+        print("İç teste davet gönderildi:", EMAIL)
+    except urllib.error.HTTPError as e:
+        print("   iç teste eklenemedi (App Store Connect kullanıcısı değil):", getattr(e, "body", "")[:200])
+        g = dis_grup()
+        call("POST", "/betaTesters", {"data": {"type": "betaTesters",
+             "attributes": {"email": EMAIL},
+             "relationships": {"betaGroups": {"data": [{"type": "betaGroups", "id": g["id"]}]}}}})
+        print("Dış teste davet gönderildi:", EMAIL)
 print("Tamam: iPhone'da TestFlight uygulamasını aç, Yükle Detayla'yı kur.")

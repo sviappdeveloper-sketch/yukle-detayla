@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       email:
-        description: "Test kullanıcısının App Store Connect e-postası"
-        default: "sviapp.developer@gmail.com"
+        description: "Test kullanıcılarının e-postaları (virgülle)"
+        default: "sviapp.developer@gmail.com,sitaresivi@icloud.com"
 jobs:
   tf:
     runs-on: ubuntu-latest
