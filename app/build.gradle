@@ -4,9 +4,9 @@ if (file('google-services.json').exists()) {
   apply plugin: 'com.google.gms.google-services'
 }
 
-// AdMob kimlikleri (gerçek kimlikler gelince burası değişecek; şu an Google'ın test kimlikleri)
-def ADMOB_APP_ID = 'ca-app-pub-3940256099942544~3347511713'
-def ADMOB_INTERSTITIAL_ID = 'ca-app-pub-3940256099942544/1033173712'
+// AdMob kimlikleri (Yükle Detayla Android, gerçek kimlikler)
+def ADMOB_APP_ID = 'ca-app-pub-5425620592844224~1168197611'
+def ADMOB_INTERSTITIAL_ID = 'ca-app-pub-5425620592844224/4915870939'
 
 android {
   namespace 'com.mobihome.yukledetayla'

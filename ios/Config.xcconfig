@@ -7,5 +7,5 @@ PRODUCT_BUNDLE_IDENTIFIER = com.mobihome.yukledetayla
 GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.934726019565-e87pk6kvsbtv3vd61qtn4o84lth1fej1
 
 // AdMob → Yükle Detayla (iOS). Google'ın test kimlikleri (3940256099942544) yazılırsa uygulama reklamsız çalışır.
-YD_ADMOB_APP_ID = ca-app-pub-3940256099942544~1458002511
-YD_AD_INTERSTITIAL = ca-app-pub-3940256099942544/4411468910
+YD_ADMOB_APP_ID = ca-app-pub-5425620592844224~4153006496
+YD_AD_INTERSTITIAL = ca-app-pub-5425620592844224/9757134071
