@@ -1,0 +1,20 @@
+name: TestFlight iç test
+# İç test grubunu açar ve e-postayı test kullanıcısı olarak ekler. Gizli değer: ASC_KEY_P8
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Test kullanıcısının App Store Connect e-postası"
+        default: "sviapp.developer@gmail.com"
+jobs:
+  tf:
+    runs-on: ubuntu-latest
+    env:
+      ASC_KEY_ID: 9PJ9V3965R
+      ASC_ISSUER_ID: 195bfec6-edd0-4a8e-8cd8-6a1d5d51bb6e
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      TESTER_EMAIL: ${{ inputs.email }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip3 install --quiet pyjwt cryptography
+      - run: python3 tool/testflight.py
