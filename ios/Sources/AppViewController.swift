@@ -364,8 +364,11 @@ final class AppViewController: UIViewController {
     requestTrackingIfNeeded()
   }
   private var trackingAsking = false
+  // İzleme izni her zaman açılışta sorulur (reklam kimlikleri henüz test olsa bile):
+  // App Store incelemesi ATT penceresinin görünmesini şart koşuyor. Reklamlar yine yalnızca
+  // gerçek AdMob kimlikleri yazılınca başlar.
   private func requestTrackingIfNeeded() {
-    guard Self.adsReady, !trackingAsking else { return }
+    guard !trackingAsking else { return }
     guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { afterTracking(); return }
     trackingAsking = true
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
@@ -380,7 +383,7 @@ final class AppViewController: UIViewController {
       }
     }
   }
-  private func afterTracking() { if !askedConsent { askedConsent = true; setupAds() } }
+  private func afterTracking() { if Self.adsReady && !askedConsent { askedConsent = true; setupAds() } }
   private func setupAds() {
     let info = ConsentInformation.shared
     info.requestConsentInfoUpdate(with: RequestParameters()) { [weak self] _ in
