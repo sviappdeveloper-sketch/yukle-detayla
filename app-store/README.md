@@ -6,7 +6,7 @@
 - **Tam açıklama:** `metadata.json` içindeki `description` ile aynı.
 - **Kategori:** Eğitim · **Etiketler:** Eğitim, Çalışma
 - **Görseller:** `android/icon-512.png`, `android/feature-1024x500.png`, telefon ekran görüntüleri `android/*.png` (1080×2160)
-- **İletişim:** sviapp.developer@gmail.com · **Gizlilik:** https://sviappdeveloper-sketch.github.io/yukle-detayla/gizlilik.html
+- **İletişim:** iletisim@sviapp.com · **Gizlilik:** https://sviappdeveloper-sketch.github.io/yukle-detayla/gizlilik.html
 - **Hesap silme adresi:** https://sviappdeveloper-sketch.github.io/yukle-detayla/hesap-silme.html
 
 ## Play Console · Veri güvenliği formu

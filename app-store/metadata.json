@@ -16,7 +16,7 @@
   "review": {
     "contactFirstName": "Seyfullah",
     "contactLastName": "Sivi",
-    "contactEmail": "sviapp.developer@gmail.com",
+    "contactEmail": "iletisim@sviapp.com",
     "contactPhone": "+905453896534",
     "demoAccountRequired": true,
     "notes": "Yükle Detayla turns a user's own study PDF (or photos of notebook/book pages) into a summary and multiple-choice tests (20 questions each). Sign-in: Sign in with Apple or Google (Firebase Authentication). A demo account is provided in the Sign-In Information above: on the sign-in screen tap 'E-posta ile giriş yap' (below the Apple button), enter the demo e-mail and password and tap 'Giriş yap'. The demo account has access to every feature. Account deletion: gear icon on the main screen → 'Hesabımı sil' (deletes the Firebase account, revokes the Apple token and erases all local data). How to test: sign in → 'Dosya Yükle' → choose any PDF (or take a photo of a printed page) → keep 'Özet' checked, choose 1 test → 'Oluştur'. Generation takes about 20–60 seconds. Then open the summary or the test; after answering, the hint shows the source page and 'Kaynağa git' opens that page. Processing: the document text is sent over HTTPS to our Cloudflare Worker, which forwards it to the Google Gemini API and returns the result; nothing is stored on the server. Documents, tests and favorites are stored only on the device. Ads: Google AdMob interstitial before a document is generated, with the UMP consent form where required; the App Tracking Transparency prompt appears about 1 second after launch, before any ads load. No in-app purchases, no content shared between users.",
